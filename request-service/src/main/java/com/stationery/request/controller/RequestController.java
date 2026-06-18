@@ -173,7 +173,14 @@ public class RequestController {
      * Validate that the user has the required role.
      */
     private void validateRole(String actualRole, String requiredRole) {
-        if (actualRole == null || !actualRole.equalsIgnoreCase(requiredRole)) {
+        if (actualRole == null) {
+            throw new IllegalArgumentException("Access denied. Role is null");
+        }
+        boolean hasRole = actualRole.equalsIgnoreCase(requiredRole) ||
+                          actualRole.equalsIgnoreCase("ROLE_" + requiredRole) ||
+                          (requiredRole.equalsIgnoreCase("ADMIN") && actualRole.equalsIgnoreCase("ROLE_ADMIN")) ||
+                          (requiredRole.equalsIgnoreCase("STUDENT") && actualRole.equalsIgnoreCase("ROLE_STUDENT"));
+        if (!hasRole) {
             throw new IllegalArgumentException(
                     "Access denied. Required role: " + requiredRole + ", but got: " + actualRole);
         }

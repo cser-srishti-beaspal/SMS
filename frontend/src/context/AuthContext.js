@@ -42,11 +42,11 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const isAdmin = useCallback(() => {
-    return user?.role === 'ADMIN';
+    return user?.role === 'ADMIN' || user?.role === 'ROLE_ADMIN';
   }, [user]);
 
   const isStudent = useCallback(() => {
-    return user?.role === 'STUDENT';
+    return user?.role === 'STUDENT' || user?.role === 'ROLE_STUDENT';
   }, [user]);
 
   const isAuthenticated = useCallback(() => {

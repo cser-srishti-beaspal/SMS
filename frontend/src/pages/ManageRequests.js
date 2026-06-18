@@ -32,9 +32,21 @@ const ManageRequests = () => {
   const updateRequest = async (id, action) => {
     setMessage('');
     setError('');
+
+    let payload = {};
+    if (action === 'reject') {
+      const reason = window.prompt('Enter the reason for rejection:');
+      if (reason === null) return; // User cancelled the prompt
+      if (!reason.trim()) {
+        setError('A rejection reason is required.');
+        return;
+      }
+      payload = { rejectionReason: reason.trim() };
+    }
+
     try {
       const url = `/api/requests/${id}/${action}`;
-      await api.put(url, action === 'reject' ? { rejectionReason: 'Rejected by admin' } : {});
+      await api.put(url, payload);
       setMessage(`Request ${action}ed successfully.`);
       loadRequests();
     } catch (err) {

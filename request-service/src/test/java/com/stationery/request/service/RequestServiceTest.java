@@ -167,7 +167,7 @@ class RequestServiceTest {
         // Arrange
         when(requestRepository.findById(1L)).thenReturn(Optional.of(sampleRequest));
         when(inventoryClient.deductItemQuantity(eq(1L), eq(5)))
-                .thenReturn(ResponseEntity.ok(Map.of("status", "success")));
+                .thenReturn(ResponseEntity.ok(true));
         when(requestRepository.save(any(StationeryRequest.class))).thenAnswer(invocation -> {
             StationeryRequest req = invocation.getArgument(0);
             req.setUpdatedAt(LocalDateTime.now());

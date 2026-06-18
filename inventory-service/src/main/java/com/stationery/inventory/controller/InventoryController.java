@@ -44,7 +44,7 @@ public class InventoryController {
             @RequestHeader(value = "X-User-Role", defaultValue = "") String userRole,
             @RequestHeader(value = "X-User-Name", defaultValue = "SYSTEM") String userName) {
 
-        if (!"ADMIN".equalsIgnoreCase(userRole)) {
+        if (!isAdmin(userRole)) {
             log.warn("AUDIT: Unauthorized create attempt by user '{}' with role '{}'", userName, userRole);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
@@ -120,7 +120,7 @@ public class InventoryController {
             @RequestHeader(value = "X-User-Role", defaultValue = "") String userRole,
             @RequestHeader(value = "X-User-Name", defaultValue = "SYSTEM") String userName) {
 
-        if (!"ADMIN".equalsIgnoreCase(userRole)) {
+        if (!isAdmin(userRole)) {
             log.warn("AUDIT: Unauthorized update attempt on item ID {} by user '{}' with role '{}'",
                     id, userName, userRole);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
@@ -146,7 +146,7 @@ public class InventoryController {
             @RequestHeader(value = "X-User-Role", defaultValue = "") String userRole,
             @RequestHeader(value = "X-User-Name", defaultValue = "SYSTEM") String userName) {
 
-        if (!"ADMIN".equalsIgnoreCase(userRole)) {
+        if (!isAdmin(userRole)) {
             log.warn("AUDIT: Unauthorized delete attempt on item ID {} by user '{}' with role '{}'",
                     id, userName, userRole);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
@@ -168,7 +168,7 @@ public class InventoryController {
     public ResponseEntity<List<StationeryItemResponse>> getLowStockItems(
             @RequestHeader(value = "X-User-Role", defaultValue = "") String userRole) {
 
-        if (!"ADMIN".equalsIgnoreCase(userRole)) {
+        if (!isAdmin(userRole)) {
             log.warn("AUDIT: Unauthorized low-stock access attempt with role '{}'", userRole);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
@@ -207,5 +207,9 @@ public class InventoryController {
 
         List<StationeryItemResponse> items = inventoryService.searchItems(keyword);
         return ResponseEntity.ok(items);
+    }
+
+    private boolean isAdmin(String role) {
+        return "ADMIN".equalsIgnoreCase(role) || "ROLE_ADMIN".equalsIgnoreCase(role);
     }
 }

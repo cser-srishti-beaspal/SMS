@@ -27,8 +27,7 @@ const Navbar = () => {
   const adminLinks = [
     { path: '/dashboard', label: 'Dashboard', icon: '📊' },
     { path: '/inventory', label: 'Inventory', icon: '📦' },
-    { path: '/inventory/add', label: 'Add Item', icon: '➕' },
-    { path: '/requests/manage', label: 'Manage Requests', icon: '📋' },
+    { path: '/requests/manage', label: 'All Requests', icon: '📋' },
   ];
 
   const studentLinks = [

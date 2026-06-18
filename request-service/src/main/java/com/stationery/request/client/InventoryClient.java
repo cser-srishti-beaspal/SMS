@@ -16,7 +16,7 @@ public interface InventoryClient {
     ResponseEntity<Map<String, Object>> getInventoryItem(@PathVariable("id") Long id);
 
     @PutMapping("/api/inventory/{id}/deduct")
-    ResponseEntity<Map<String, Object>> deductItemQuantity(
+    ResponseEntity<Boolean> deductItemQuantity(
             @PathVariable("id") Long id,
             @RequestParam("quantity") Integer quantity
     );

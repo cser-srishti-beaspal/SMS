@@ -23,6 +23,19 @@ const CreateRequest = () => {
     };
 
     loadItems();
+
+    // Prepopulate from cart if items were added
+    try {
+      const savedCart = localStorage.getItem('sms_cart');
+      if (savedCart) {
+        const parsedCart = JSON.parse(savedCart);
+        if (parsedCart.length > 0) {
+          setRequestItems(parsedCart);
+        }
+      }
+    } catch (e) {
+      console.error('Error loading cart from localStorage:', e);
+    }
   }, []);
 
   const addItem = () => {
@@ -69,6 +82,7 @@ const CreateRequest = () => {
     setLoading(true);
     try {
       await api.post('/api/requests', { items: payload });
+      localStorage.removeItem('sms_cart');
       setSuccess('Request created successfully.');
       setTimeout(() => navigate('/requests/my'), 1200);
     } catch (err) {
