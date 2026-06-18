@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Auth Service</a> &gt; <a href="index.source.html" class="el_package">com.stationery.auth.controller</a> &gt; <span class="el_source">AuthController.java</span></div><h1>AuthController.java</h1><pre class="source lang-java linenums">package com.stationery.auth.controller;
+
+import com.stationery.auth.dto.AuthResponse;
+import com.stationery.auth.dto.LoginRequest;
+import com.stationery.auth.dto.RegisterRequest;
+import com.stationery.auth.service.AuthService;
+import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+/**
+ * REST controller for authentication operations.
+ * Handles user registration, login, and token validation endpoints.
+ */
+@RestController
+@RequestMapping(&quot;/api/auth&quot;)
+public class AuthController {
+
+<span class="fc" id="L22">    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);</span>
+
+    private final AuthService authService;
+
+<span class="fc" id="L26">    public AuthController(AuthService authService) {</span>
+<span class="fc" id="L27">        this.authService = authService;</span>
+<span class="fc" id="L28">    }</span>
+
+    /**
+     * Registers a new user in the system.
+     *
+     * @param request the registration request containing username, email, password, and role
+     * @return ResponseEntity with the AuthResponse containing the JWT token
+     */
+    @PostMapping(&quot;/register&quot;)
+    public ResponseEntity&lt;AuthResponse&gt; register(@Valid @RequestBody RegisterRequest request) {
+<span class="fc" id="L38">        logger.info(&quot;Registration request received for username: {}&quot;, request.getUsername());</span>
+<span class="fc" id="L39">        AuthResponse response = authService.register(request);</span>
+<span class="fc" id="L40">        logger.info(&quot;Registration successful for username: {}&quot;, request.getUsername());</span>
+<span class="fc" id="L41">        return ResponseEntity.status(HttpStatus.CREATED).body(response);</span>
+    }
+
+    /**
+     * Authenticates a user and returns a JWT token.
+     *
+     * @param request the login request containing username and password
+     * @return ResponseEntity with the AuthResponse containing the JWT token
+     */
+    @PostMapping(&quot;/login&quot;)
+    public ResponseEntity&lt;AuthResponse&gt; login(@Valid @RequestBody LoginRequest request) {
+<span class="fc" id="L52">        logger.info(&quot;Login request received for username: {}&quot;, request.getUsername());</span>
+<span class="fc" id="L53">        AuthResponse response = authService.login(request);</span>
+<span class="fc" id="L54">        logger.info(&quot;Login successful for username: {}&quot;, request.getUsername());</span>
+<span class="fc" id="L55">        return ResponseEntity.ok(response);</span>
+    }
+
+    /**
+     * Validates a JWT token provided in the Authorization header.
+     *
+     * @param authHeader the Authorization header containing the Bearer token
+     * @return ResponseEntity indicating whether the token is valid
+     */
+    @GetMapping(&quot;/validate&quot;)
+    public ResponseEntity&lt;String&gt; validateToken(@RequestHeader(&quot;Authorization&quot;) String authHeader) {
+<span class="fc" id="L66">        logger.info(&quot;Token validation request received&quot;);</span>
+
+<span class="fc bfc" id="L68" title="All 4 branches covered.">        if (authHeader == null || !authHeader.startsWith(&quot;Bearer &quot;)) {</span>
+<span class="fc" id="L69">            logger.warn(&quot;Token validation failed - invalid Authorization header format&quot;);</span>
+<span class="fc" id="L70">            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(&quot;Invalid token format&quot;);</span>
+        }
+
+<span class="fc" id="L73">        String token = authHeader.substring(7);</span>
+<span class="fc" id="L74">        boolean isValid = authService.validateToken(token);</span>
+
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (isValid) {</span>
+<span class="fc" id="L77">            logger.info(&quot;Token validation successful&quot;);</span>
+<span class="fc" id="L78">            return ResponseEntity.ok(&quot;Token is valid&quot;);</span>
+        } else {
+<span class="fc" id="L80">            logger.warn(&quot;Token validation failed - token is invalid or expired&quot;);</span>
+<span class="fc" id="L81">            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(&quot;Token is invalid or expired&quot;);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

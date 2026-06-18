@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Auth Service</a> &gt; <a href="index.source.html" class="el_package">com.stationery.auth.service</a> &gt; <span class="el_source">AuthService.java</span></div><h1>AuthService.java</h1><pre class="source lang-java linenums">package com.stationery.auth.service;
+
+import com.stationery.auth.dto.AuthResponse;
+import com.stationery.auth.dto.LoginRequest;
+import com.stationery.auth.dto.RegisterRequest;
+import com.stationery.auth.model.Role;
+import com.stationery.auth.model.User;
+import com.stationery.auth.repository.UserRepository;
+import com.stationery.auth.security.JwtUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+/**
+ * Service handling user registration, login, and token validation logic.
+ */
+@Service
+public class AuthService {
+
+<span class="fc" id="L24">    private static final Logger logger = LoggerFactory.getLogger(AuthService.class);</span>
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
+    private final AuthenticationManager authenticationManager;
+
+    public AuthService(UserRepository userRepository,
+                       PasswordEncoder passwordEncoder,
+                       JwtUtil jwtUtil,
+<span class="fc" id="L34">                       AuthenticationManager authenticationManager) {</span>
+<span class="fc" id="L35">        this.userRepository = userRepository;</span>
+<span class="fc" id="L36">        this.passwordEncoder = passwordEncoder;</span>
+<span class="fc" id="L37">        this.jwtUtil = jwtUtil;</span>
+<span class="fc" id="L38">        this.authenticationManager = authenticationManager;</span>
+<span class="fc" id="L39">    }</span>
+
+    /**
+     * Registers a new user in the system.
+     * Validates that the username and email are not already taken,
+     * encodes the password, saves the user, and returns a JWT token.
+     *
+     * @param request the registration request DTO
+     * @return an AuthResponse containing the JWT token and user details
+     * @throws RuntimeException if the username or email already exists
+     */
+    public AuthResponse register(RegisterRequest request) {
+<span class="fc" id="L51">        logger.info(&quot;Attempting to register user: {}&quot;, request.getUsername());</span>
+
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (userRepository.existsByUsername(request.getUsername())) {</span>
+<span class="fc" id="L54">            logger.warn(&quot;Registration failed - username already exists: {}&quot;, request.getUsername());</span>
+<span class="fc" id="L55">            throw new RuntimeException(&quot;Username already exists: &quot; + request.getUsername());</span>
+        }
+
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (userRepository.existsByEmail(request.getEmail())) {</span>
+<span class="fc" id="L59">            logger.warn(&quot;Registration failed - email already exists: {}&quot;, request.getEmail());</span>
+<span class="fc" id="L60">            throw new RuntimeException(&quot;Email already exists: &quot; + request.getEmail());</span>
+        }
+
+        Role role;
+        try {
+<span class="fc" id="L65">            role = Role.valueOf(request.getRole().toUpperCase());</span>
+<span class="nc" id="L66">        } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L67">            logger.warn(&quot;Invalid role provided: {}, defaulting to STUDENT&quot;, request.getRole());</span>
+<span class="nc" id="L68">            role = Role.STUDENT;</span>
+<span class="fc" id="L69">        }</span>
+
+<span class="fc" id="L71">        User user = User.builder()</span>
+<span class="fc" id="L72">                .username(request.getUsername())</span>
+<span class="fc" id="L73">                .email(request.getEmail())</span>
+<span class="fc" id="L74">                .password(passwordEncoder.encode(request.getPassword()))</span>
+<span class="fc" id="L75">                .role(role)</span>
+<span class="fc" id="L76">                .build();</span>
+
+<span class="fc" id="L78">        userRepository.save(user);</span>
+<span class="fc" id="L79">        logger.info(&quot;User registered successfully: {}&quot;, user.getUsername());</span>
+
+<span class="fc" id="L81">        String token = jwtUtil.generateToken(user.getUsername(), user.getRole().name());</span>
+
+<span class="fc" id="L83">        return AuthResponse.builder()</span>
+<span class="fc" id="L84">                .token(token)</span>
+<span class="fc" id="L85">                .username(user.getUsername())</span>
+<span class="fc" id="L86">                .role(user.getRole().name())</span>
+<span class="fc" id="L87">                .message(&quot;User registered successfully&quot;)</span>
+<span class="fc" id="L88">                .build();</span>
+    }
+
+    /**
+     * Authenticates a user and returns a JWT token.
+     *
+     * @param request the login request DTO
+     * @return an AuthResponse containing the JWT token and user details
+     */
+    public AuthResponse login(LoginRequest request) {
+<span class="fc" id="L98">        logger.info(&quot;Attempting login for user: {}&quot;, request.getUsername());</span>
+
+<span class="fc" id="L100">        Authentication authentication = authenticationManager.authenticate(</span>
+                new UsernamePasswordAuthenticationToken(
+<span class="fc" id="L102">                        request.getUsername(),</span>
+<span class="fc" id="L103">                        request.getPassword()</span>
+                )
+        );
+
+<span class="fc" id="L107">        logger.info(&quot;User authenticated successfully: {}&quot;, request.getUsername());</span>
+
+<span class="fc" id="L109">        User user = userRepository.findByUsername(request.getUsername())</span>
+<span class="pc" id="L110">                .orElseThrow(() -&gt; new RuntimeException(&quot;User not found: &quot; + request.getUsername()));</span>
+
+<span class="fc" id="L112">        String token = jwtUtil.generateToken(user.getUsername(), user.getRole().name());</span>
+
+<span class="fc" id="L114">        return AuthResponse.builder()</span>
+<span class="fc" id="L115">                .token(token)</span>
+<span class="fc" id="L116">                .username(user.getUsername())</span>
+<span class="fc" id="L117">                .role(user.getRole().name())</span>
+<span class="fc" id="L118">                .message(&quot;Login successful&quot;)</span>
+<span class="fc" id="L119">                .build();</span>
+    }
+
+    /**
+     * Validates a JWT token.
+     *
+     * @param token the JWT token to validate
+     * @return true if the token is valid, false otherwise
+     */
+    public boolean validateToken(String token) {
+<span class="nc" id="L129">        return jwtUtil.validateToken(token);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

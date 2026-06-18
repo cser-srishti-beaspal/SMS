@@ -1,1 +1,4 @@
 E:\stationery-management\auth-service\src\test\java\com\stationery\auth\service\AuthServiceTest.java
+E:\stationery-management\auth-service\src\test\java\com\stationery\auth\security\CustomUserDetailsServiceTest.java
+E:\stationery-management\auth-service\src\test\java\com\stationery\auth\controller\AuthControllerTest.java
+E:\stationery-management\auth-service\src\test\java\com\stationery\auth\security\JwtUtilTest.java

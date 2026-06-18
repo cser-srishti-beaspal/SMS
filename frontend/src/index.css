@@ -4,49 +4,49 @@
 
 :root {
   /* Background Colors */
-  --bg-primary: #0a0e1a;
-  --bg-secondary: #111827;
-  --bg-tertiary: #1a1f2e;
-  --bg-card: rgba(255, 255, 255, 0.05);
-  --bg-card-hover: rgba(255, 255, 255, 0.08);
+  --bg-primary: #f9fafb; /* Light neutral background */
+  --bg-secondary: #ffffff; /* Solid white background */
+  --bg-tertiary: #f3f4f6; /* Soft gray */
+  --bg-card: rgba(0, 0, 0, 0.02); /* Glass background for light theme */
+  --bg-card-hover: rgba(0, 0, 0, 0.04);
 
   /* Accent Colors */
-  --accent-primary: #6366f1;
-  --accent-secondary: #8b5cf6;
+  --accent-primary: #4b5563; /* Slate gray */
+  --accent-secondary: #1f2937;
   --accent-emerald: #10b981;
   --accent-teal: #14b8a6;
 
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #6366f1, #8b5cf6);
-  --gradient-secondary: linear-gradient(135deg, #10b981, #14b8a6);
-  --gradient-danger: linear-gradient(135deg, #ef4444, #f97316);
-  --gradient-warning: linear-gradient(135deg, #f59e0b, #eab308);
-  --gradient-info: linear-gradient(135deg, #3b82f6, #6366f1);
+  --gradient-primary: linear-gradient(135deg, #4b5563, #1f2937); /* Clean dark neutral gradient for primary buttons */
+  --gradient-secondary: linear-gradient(135deg, #9ca3af, #6b7280); /* Muted gray gradient */
+  --gradient-danger: linear-gradient(135deg, #ef4444, #dc2626);
+  --gradient-warning: linear-gradient(135deg, #f59e0b, #d97706);
+  --gradient-info: linear-gradient(135deg, #3b82f6, #2563eb);
 
   /* Text Colors */
-  --text-primary: #f9fafb;
-  --text-secondary: #d1d5db;
-  --text-muted: #9ca3af;
-  --text-dimmed: #6b7280;
+  --text-primary: #111827; /* Dark charcoal text */
+  --text-secondary: #374151; /* Dark gray text */
+  --text-muted: #6b7280; /* Medium gray text */
+  --text-dimmed: #9ca3af; /* Light gray text */
 
   /* Border Colors */
-  --border-subtle: rgba(255, 255, 255, 0.1);
-  --border-medium: rgba(255, 255, 255, 0.15);
-  --border-focus: rgba(99, 102, 241, 0.5);
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-medium: rgba(0, 0, 0, 0.12);
+  --border-focus: rgba(0, 0, 0, 0.25);
 
   /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --shadow-glow-primary: 0 0 20px rgba(99, 102, 241, 0.3);
-  --shadow-glow-emerald: 0 0 20px rgba(16, 185, 129, 0.3);
-  --shadow-glow-danger: 0 0 20px rgba(239, 68, 68, 0.3);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --shadow-glow-primary: 0 0 20px rgba(75, 85, 99, 0.15);
+  --shadow-glow-emerald: 0 0 20px rgba(16, 185, 129, 0.15);
+  --shadow-glow-danger: 0 0 20px rgba(239, 68, 68, 0.15);
 
   /* Glassmorphism */
-  --glass-bg: rgba(255, 255, 255, 0.05);
-  --glass-bg-hover: rgba(255, 255, 255, 0.08);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-blur: blur(20px);
+  --glass-bg: rgba(255, 255, 255, 0.75); /* Highly visible light glass */
+  --glass-bg-hover: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-blur: blur(24px);
 
   /* Spacing */
   --radius-sm: 8px;
@@ -100,9 +100,8 @@ body::before {
   right: 0;
   bottom: 0;
   background:
-    radial-gradient(ellipse at 20% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 80%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 50%, rgba(16, 185, 129, 0.04) 0%, transparent 50%);
+    radial-gradient(ellipse at 20% 20%, rgba(255, 255, 255, 0.01) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(255, 255, 255, 0.005) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
 }
@@ -156,12 +155,12 @@ img {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.3);
+  background: rgba(0, 0, 0, 0.12);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.5);
+  background: rgba(0, 0, 0, 0.22);
 }
 
 /* =========================================

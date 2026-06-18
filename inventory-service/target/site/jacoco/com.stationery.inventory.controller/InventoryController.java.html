@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InventoryController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Inventory Service</a> &gt; <a href="index.source.html" class="el_package">com.stationery.inventory.controller</a> &gt; <span class="el_source">InventoryController.java</span></div><h1>InventoryController.java</h1><pre class="source lang-java linenums">package com.stationery.inventory.controller;
+
+import com.stationery.inventory.dto.StationeryItemRequest;
+import com.stationery.inventory.dto.StationeryItemResponse;
+import com.stationery.inventory.service.InventoryService;
+import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * REST controller for inventory management operations.
+ * Exposes endpoints for CRUD operations, stock management, search, and low-stock alerts.
+ * Admin-only operations are protected via X-User-Role header checks (set by API Gateway).
+ */
+@RestController
+@RequestMapping(&quot;/api/inventory&quot;)
+public class InventoryController {
+
+<span class="fc" id="L25">    private static final Logger log = LoggerFactory.getLogger(InventoryController.class);</span>
+
+    private final InventoryService inventoryService;
+
+<span class="fc" id="L29">    public InventoryController(InventoryService inventoryService) {</span>
+<span class="fc" id="L30">        this.inventoryService = inventoryService;</span>
+<span class="fc" id="L31">    }</span>
+
+    /**
+     * Creates a new stationery item. Admin-only.
+     *
+     * @param request   the item creation request
+     * @param userRole  the role from X-User-Role header
+     * @param userName  the username from X-User-Name header
+     * @return the created item with HTTP 201
+     */
+    @PostMapping
+    public ResponseEntity&lt;StationeryItemResponse&gt; createItem(
+            @Valid @RequestBody StationeryItemRequest request,
+            @RequestHeader(value = &quot;X-User-Role&quot;, defaultValue = &quot;&quot;) String userRole,
+            @RequestHeader(value = &quot;X-User-Name&quot;, defaultValue = &quot;SYSTEM&quot;) String userName) {
+
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (!isAdmin(userRole)) {</span>
+<span class="fc" id="L48">            log.warn(&quot;AUDIT: Unauthorized create attempt by user '{}' with role '{}'&quot;, userName, userRole);</span>
+<span class="fc" id="L49">            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();</span>
+        }
+
+<span class="fc" id="L52">        log.info(&quot;AUDIT: User '{}' (role: {}) creating new stationery item: '{}'&quot;,</span>
+<span class="fc" id="L53">                userName, userRole, request.getName());</span>
+
+<span class="fc" id="L55">        StationeryItemResponse response = inventoryService.createItem(request);</span>
+<span class="fc" id="L56">        return new ResponseEntity&lt;&gt;(response, HttpStatus.CREATED);</span>
+    }
+
+    /**
+     * Retrieves all stationery items with pagination.
+     *
+     * @param page   page number (default 0)
+     * @param size   page size (default 20)
+     * @param sortBy sort field (default &quot;name&quot;)
+     * @return paginated list of items
+     */
+    @GetMapping
+    public ResponseEntity&lt;Page&lt;StationeryItemResponse&gt;&gt; getAllItems(
+            @RequestParam(defaultValue = &quot;0&quot;) int page,
+            @RequestParam(defaultValue = &quot;20&quot;) int size,
+            @RequestParam(defaultValue = &quot;name&quot;) String sortBy) {
+
+<span class="fc" id="L73">        Page&lt;StationeryItemResponse&gt; items = inventoryService.getAllItems(page, size, sortBy);</span>
+<span class="fc" id="L74">        return ResponseEntity.ok(items);</span>
+    }
+
+    /**
+     * Retrieves a specific stationery item by ID.
+     *
+     * @param id the item ID
+     * @return the item details
+     */
+    @GetMapping(&quot;/{id}&quot;)
+    public ResponseEntity&lt;StationeryItemResponse&gt; getItemById(@PathVariable Long id) {
+<span class="fc" id="L85">        StationeryItemResponse response = inventoryService.getItemById(id);</span>
+<span class="fc" id="L86">        return ResponseEntity.ok(response);</span>
+    }
+
+    /**
+     * Retrieves stationery items filtered by category with pagination.
+     *
+     * @param category the category to filter by
+     * @param page     page number (default 0)
+     * @param size     page size (default 20)
+     * @return paginated list of items in the category
+     */
+    @GetMapping(&quot;/category/{category}&quot;)
+    public ResponseEntity&lt;Page&lt;StationeryItemResponse&gt;&gt; getItemsByCategory(
+            @PathVariable String category,
+            @RequestParam(defaultValue = &quot;0&quot;) int page,
+            @RequestParam(defaultValue = &quot;20&quot;) int size) {
+
+<span class="fc" id="L103">        Page&lt;StationeryItemResponse&gt; items = inventoryService.getItemsByCategory(category, page, size);</span>
+<span class="fc" id="L104">        return ResponseEntity.ok(items);</span>
+    }
+
+    /**
+     * Updates an existing stationery item. Admin-only.
+     *
+     * @param id       the item ID to update
+     * @param request  the update request
+     * @param userRole the role from X-User-Role header
+     * @param userName the username from X-User-Name header
+     * @return the updated item
+     */
+    @PutMapping(&quot;/{id}&quot;)
+    public ResponseEntity&lt;StationeryItemResponse&gt; updateItem(
+            @PathVariable Long id,
+            @Valid @RequestBody StationeryItemRequest request,
+            @RequestHeader(value = &quot;X-User-Role&quot;, defaultValue = &quot;&quot;) String userRole,
+            @RequestHeader(value = &quot;X-User-Name&quot;, defaultValue = &quot;SYSTEM&quot;) String userName) {
+
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (!isAdmin(userRole)) {</span>
+<span class="fc" id="L124">            log.warn(&quot;AUDIT: Unauthorized update attempt on item ID {} by user '{}' with role '{}'&quot;,</span>
+                    id, userName, userRole);
+<span class="fc" id="L126">            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();</span>
+        }
+
+<span class="fc" id="L129">        log.info(&quot;AUDIT: User '{}' (role: {}) updating stationery item ID: {}&quot;, userName, userRole, id);</span>
+
+<span class="fc" id="L131">        StationeryItemResponse response = inventoryService.updateItem(id, request);</span>
+<span class="fc" id="L132">        return ResponseEntity.ok(response);</span>
+    }
+
+    /**
+     * Deletes a stationery item. Admin-only.
+     *
+     * @param id       the item ID to delete
+     * @param userRole the role from X-User-Role header
+     * @param userName the username from X-User-Name header
+     * @return HTTP 204 No Content on success
+     */
+    @DeleteMapping(&quot;/{id}&quot;)
+    public ResponseEntity&lt;Void&gt; deleteItem(
+            @PathVariable Long id,
+            @RequestHeader(value = &quot;X-User-Role&quot;, defaultValue = &quot;&quot;) String userRole,
+            @RequestHeader(value = &quot;X-User-Name&quot;, defaultValue = &quot;SYSTEM&quot;) String userName) {
+
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (!isAdmin(userRole)) {</span>
+<span class="fc" id="L150">            log.warn(&quot;AUDIT: Unauthorized delete attempt on item ID {} by user '{}' with role '{}'&quot;,</span>
+                    id, userName, userRole);
+<span class="fc" id="L152">            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();</span>
+        }
+
+<span class="fc" id="L155">        log.info(&quot;AUDIT: User '{}' (role: {}) deleting stationery item ID: {}&quot;, userName, userRole, id);</span>
+
+<span class="fc" id="L157">        inventoryService.deleteItem(id);</span>
+<span class="fc" id="L158">        return ResponseEntity.noContent().build();</span>
+    }
+
+    /**
+     * Retrieves all items that are at or below their minimum stock level. Admin-only.
+     *
+     * @param userRole the role from X-User-Role header
+     * @return list of low-stock items
+     */
+    @GetMapping(&quot;/low-stock&quot;)
+    public ResponseEntity&lt;List&lt;StationeryItemResponse&gt;&gt; getLowStockItems(
+            @RequestHeader(value = &quot;X-User-Role&quot;, defaultValue = &quot;&quot;) String userRole) {
+
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (!isAdmin(userRole)) {</span>
+<span class="fc" id="L172">            log.warn(&quot;AUDIT: Unauthorized low-stock access attempt with role '{}'&quot;, userRole);</span>
+<span class="fc" id="L173">            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();</span>
+        }
+
+<span class="fc" id="L176">        List&lt;StationeryItemResponse&gt; lowStockItems = inventoryService.getLowStockItems();</span>
+<span class="fc" id="L177">        return ResponseEntity.ok(lowStockItems);</span>
+    }
+
+    /**
+     * Deducts a quantity from an item's stock. Called internally by request-service.
+     *
+     * @param id       the item ID
+     * @param quantity the quantity to deduct
+     * @return true if deduction was successful
+     */
+    @PutMapping(&quot;/{id}/deduct&quot;)
+    public ResponseEntity&lt;Boolean&gt; deductQuantity(
+            @PathVariable Long id,
+            @RequestParam Integer quantity) {
+
+<span class="fc" id="L192">        log.info(&quot;AUDIT: Internal service call - deducting {} units from item ID: {}&quot;, quantity, id);</span>
+
+<span class="fc" id="L194">        boolean result = inventoryService.deductQuantity(id, quantity);</span>
+<span class="fc" id="L195">        return ResponseEntity.ok(result);</span>
+    }
+
+    /**
+     * Searches for stationery items by keyword (case-insensitive name match).
+     *
+     * @param keyword the search keyword
+     * @return list of matching items
+     */
+    @GetMapping(&quot;/search&quot;)
+    public ResponseEntity&lt;List&lt;StationeryItemResponse&gt;&gt; searchItems(
+            @RequestParam String keyword) {
+
+<span class="fc" id="L208">        List&lt;StationeryItemResponse&gt; items = inventoryService.searchItems(keyword);</span>
+<span class="fc" id="L209">        return ResponseEntity.ok(items);</span>
+    }
+
+    private boolean isAdmin(String role) {
+<span class="fc bfc" id="L213" title="All 4 branches covered.">        return &quot;ADMIN&quot;.equalsIgnoreCase(role) || &quot;ROLE_ADMIN&quot;.equalsIgnoreCase(role);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

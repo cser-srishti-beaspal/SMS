@@ -61,6 +61,7 @@ const MyRequests = () => {
               <th>Status</th>
               <th>Items</th>
               <th>Admin</th>
+              <th>Remarks / Reason</th>
               <th>Updated</th>
             </tr>
           </thead>
@@ -77,12 +78,17 @@ const MyRequests = () => {
                   </td>
                   <td>{request.items?.map((item) => `${item.itemName} x${item.quantity}`).join(', ')}</td>
                   <td>{request.adminUsername || '—'}</td>
+                  <td style={{ color: request.status === 'REJECTED' ? '#f87171' : 'var(--text-muted)' }}>
+                    {request.status === 'REJECTED' 
+                      ? (request.rejectionReason || 'No reason specified') 
+                      : '—'}
+                  </td>
                   <td>{request.updatedAt ? new Date(request.updatedAt).toLocaleString() : '—'}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="6" className="empty-row">
+                <td colSpan="7" className="empty-row">
                   {loading ? 'Loading requests...' : 'No requests found.'}
                 </td>
               </tr>

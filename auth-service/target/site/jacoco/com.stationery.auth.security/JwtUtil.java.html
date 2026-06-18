@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JwtUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Auth Service</a> &gt; <a href="index.source.html" class="el_package">com.stationery.auth.security</a> &gt; <span class="el_source">JwtUtil.java</span></div><h1>JwtUtil.java</h1><pre class="source lang-java linenums">package com.stationery.auth.security;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.UnsupportedJwtException;
+import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SecurityException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+
+/**
+ * Utility class for JWT token generation, parsing, and validation.
+ */
+@Component
+<span class="fc" id="L23">public class JwtUtil {</span>
+
+<span class="fc" id="L25">    private static final Logger logger = LoggerFactory.getLogger(JwtUtil.class);</span>
+
+    @Value(&quot;${jwt.secret}&quot;)
+    private String secret;
+
+    @Value(&quot;${jwt.expiration}&quot;)
+    private Long expiration;
+
+    /**
+     * Returns the HMAC-SHA signing key derived from the configured secret.
+     *
+     * @return the SecretKey for signing and verifying tokens
+     */
+    private SecretKey getSigningKey() {
+<span class="fc" id="L39">        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L40">        return Keys.hmacShaKeyFor(keyBytes);</span>
+    }
+
+    /**
+     * Generates a JWT token for the given username and role.
+     *
+     * @param username the username to set as the token subject
+     * @param role     the user role to include as a claim
+     * @return the signed JWT token string
+     */
+    public String generateToken(String username, String role) {
+<span class="fc" id="L51">        Date now = new Date();</span>
+<span class="fc" id="L52">        Date expiryDate = new Date(now.getTime() + expiration);</span>
+
+<span class="fc" id="L54">        return Jwts.builder()</span>
+<span class="fc" id="L55">                .subject(username)</span>
+<span class="fc" id="L56">                .claim(&quot;role&quot;, role)</span>
+<span class="fc" id="L57">                .issuedAt(now)</span>
+<span class="fc" id="L58">                .expiration(expiryDate)</span>
+<span class="fc" id="L59">                .signWith(getSigningKey())</span>
+<span class="fc" id="L60">                .compact();</span>
+    }
+
+    /**
+     * Extracts the username (subject) from the given JWT token.
+     *
+     * @param token the JWT token
+     * @return the username
+     */
+    public String extractUsername(String token) {
+<span class="fc" id="L70">        return extractAllClaims(token).getSubject();</span>
+    }
+
+    /**
+     * Extracts the role claim from the given JWT token.
+     *
+     * @param token the JWT token
+     * @return the role string
+     */
+    public String extractRole(String token) {
+<span class="fc" id="L80">        return extractAllClaims(token).get(&quot;role&quot;, String.class);</span>
+    }
+
+    /**
+     * Validates the given JWT token by checking its signature and expiration.
+     *
+     * @param token the JWT token to validate
+     * @return true if the token is valid, false otherwise
+     */
+    public boolean validateToken(String token) {
+        try {
+<span class="fc" id="L91">            Jwts.parser()</span>
+<span class="fc" id="L92">                    .verifyWith(getSigningKey())</span>
+<span class="fc" id="L93">                    .build()</span>
+<span class="fc" id="L94">                    .parseSignedClaims(token);</span>
+<span class="fc" id="L95">            return true;</span>
+<span class="nc" id="L96">        } catch (SecurityException e) {</span>
+<span class="nc" id="L97">            logger.error(&quot;Invalid JWT signature: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L98">        } catch (MalformedJwtException e) {</span>
+<span class="fc" id="L99">            logger.error(&quot;Invalid JWT token: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L100">        } catch (ExpiredJwtException e) {</span>
+<span class="fc" id="L101">            logger.error(&quot;JWT token is expired: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L102">        } catch (UnsupportedJwtException e) {</span>
+<span class="nc" id="L103">            logger.error(&quot;JWT token is unsupported: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L104">        } catch (IllegalArgumentException e) {</span>
+<span class="fc" id="L105">            logger.error(&quot;JWT claims string is empty: {}&quot;, e.getMessage());</span>
+<span class="pc" id="L106">        }</span>
+<span class="fc" id="L107">        return false;</span>
+    }
+
+    /**
+     * Parses and returns all claims from the given JWT token.
+     *
+     * @param token the JWT token
+     * @return the Claims object
+     */
+    private Claims extractAllClaims(String token) {
+<span class="fc" id="L117">        return Jwts.parser()</span>
+<span class="fc" id="L118">                .verifyWith(getSigningKey())</span>
+<span class="fc" id="L119">                .build()</span>
+<span class="fc" id="L120">                .parseSignedClaims(token)</span>
+<span class="fc" id="L121">                .getPayload();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
