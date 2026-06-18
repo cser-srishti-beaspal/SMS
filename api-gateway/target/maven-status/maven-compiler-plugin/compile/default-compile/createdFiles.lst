@@ -1,0 +1,3 @@
+com\stationery\gateway\config\CorsConfig.class
+com\stationery\gateway\filter\JwtAuthFilter.class
+com\stationery\gateway\ApiGatewayApplication.class

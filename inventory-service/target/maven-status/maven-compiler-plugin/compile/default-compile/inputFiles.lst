@@ -1,0 +1,12 @@
+F:\Downloads\SMS\stationery-management\inventory-service\src\main\java\com\stationery\inventory\model\StationeryItem.java
+F:\Downloads\SMS\stationery-management\inventory-service\src\main\java\com\stationery\inventory\dto\StationeryItemResponse.java
+F:\Downloads\SMS\stationery-management\inventory-service\src\main\java\com\stationery\inventory\exception\InsufficientStockException.java
+F:\Downloads\SMS\stationery-management\inventory-service\src\main\java\com\stationery\inventory\exception\ResourceNotFoundException.java
+F:\Downloads\SMS\stationery-management\inventory-service\src\main\java\com\stationery\inventory\controller\InventoryController.java
+F:\Downloads\SMS\stationery-management\inventory-service\src\main\java\com\stationery\inventory\exception\GlobalExceptionHandler.java
+F:\Downloads\SMS\stationery-management\inventory-service\src\main\java\com\stationery\inventory\service\InventoryService.java
+F:\Downloads\SMS\stationery-management\inventory-service\src\main\java\com\stationery\inventory\InventoryServiceApplication.java
+F:\Downloads\SMS\stationery-management\inventory-service\src\main\java\com\stationery\inventory\repository\StationeryItemRepository.java
+F:\Downloads\SMS\stationery-management\inventory-service\src\main\java\com\stationery\inventory\dto\StationeryItemRequest.java
+F:\Downloads\SMS\stationery-management\inventory-service\src\main\java\com\stationery\inventory\exception\ErrorResponse.java
+F:\Downloads\SMS\stationery-management\inventory-service\src\main\java\com\stationery\inventory\model\Category.java
