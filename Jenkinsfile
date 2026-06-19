@@ -13,11 +13,13 @@
 pipeline {
     agent any
 
+    /*
     tools {
         maven 'Maven-3.9'
         jdk 'JDK-17'
         nodejs 'NodeJS-18'
     }
+    */
 
     environment {
         DOCKER_REGISTRY  = credentials('docker-registry-url')
@@ -306,7 +308,7 @@ pipeline {
             echo '❌ ========================================='
         }
         unstable {
-            echo '⚠️ Pipeline completed with warnings. Review test results.'
+            echo 'Pipeline completed with warnings. Review test results.'
         }
     }
 }
