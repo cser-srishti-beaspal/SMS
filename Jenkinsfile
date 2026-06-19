@@ -22,10 +22,11 @@ pipeline {
     */
 
     environment {
-        DOCKER_REGISTRY  = credentials('docker-registry-url')
-        DOCKER_CREDS     = credentials('docker-registry-creds')
         IMAGE_TAG        = "${env.BUILD_NUMBER}"
         COMPOSE_PROJECT  = 'sms'
+        DOCKER_REGISTRY  = 'local'
+        HAS_REGISTRY     = 'false'
+        HAS_CREDS        = 'false'
     }
 
     options {
@@ -44,6 +45,38 @@ pipeline {
             steps {
                 echo '🔄 Checking out source code...'
                 checkout scm
+            }
+        }
+
+        // ──────────────────────────────────────────────────
+        // Stage 1.5: Setup Credentials & Registry
+        // ──────────────────────────────────────────────────
+        stage('Setup Credentials') {
+            steps {
+                script {
+                    echo '⚙️ Resolving registry credentials...'
+                    try {
+                        withCredentials([string(credentialsId: 'docker-registry-url', variable: 'REG_URL')]) {
+                            env.DOCKER_REGISTRY = REG_URL
+                            env.HAS_REGISTRY = 'true'
+                            echo "✅ Docker registry URL resolved: ${env.DOCKER_REGISTRY}"
+                        }
+                    } catch (Throwable t) {
+                        env.DOCKER_REGISTRY = 'local'
+                        env.HAS_REGISTRY = 'false'
+                        echo "⚠️ 'docker-registry-url' credential not found. Using default local registry: ${env.DOCKER_REGISTRY}"
+                    }
+
+                    try {
+                        withCredentials([usernamePassword(credentialsId: 'docker-registry-creds', usernameVariable: 'DOCKER_CREDS_USR', passwordVariable: 'DOCKER_CREDS_PSW')]) {
+                            env.HAS_CREDS = 'true'
+                            echo "✅ Docker registry credentials verified."
+                        }
+                    } catch (Throwable t) {
+                        env.HAS_CREDS = 'false'
+                        echo "⚠️ 'docker-registry-creds' credential not found. Docker push stage will be skipped."
+                    }
+                }
             }
         }
 
@@ -241,30 +274,37 @@ pipeline {
         // Stage 7: Push Docker Images to Registry
         // ──────────────────────────────────────────────────
         stage('Docker Push') {
+            when {
+                expression { env.HAS_CREDS == 'true' && env.HAS_REGISTRY == 'true' }
+            }
             steps {
-                echo '📤 Pushing Docker images to registry...'
-                runCmd "docker login -u ${env.DOCKER_CREDS_USR} -p ${env.DOCKER_CREDS_PSW} ${env.DOCKER_REGISTRY}"
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'docker-registry-creds', usernameVariable: 'DOCKER_CREDS_USR', passwordVariable: 'DOCKER_CREDS_PSW')]) {
+                        echo '📤 Pushing Docker images to registry...'
+                        runCmd "docker login -u ${DOCKER_CREDS_USR} -p ${DOCKER_CREDS_PSW} ${env.DOCKER_REGISTRY}"
 
-                runCmd "docker push ${env.DOCKER_REGISTRY}/sms-config-server:${env.IMAGE_TAG}"
-                runCmd "docker push ${env.DOCKER_REGISTRY}/sms-config-server:latest"
+                        runCmd "docker push ${env.DOCKER_REGISTRY}/sms-config-server:${env.IMAGE_TAG}"
+                        runCmd "docker push ${env.DOCKER_REGISTRY}/sms-config-server:latest"
 
-                runCmd "docker push ${env.DOCKER_REGISTRY}/sms-eureka-server:${env.IMAGE_TAG}"
-                runCmd "docker push ${env.DOCKER_REGISTRY}/sms-eureka-server:latest"
+                        runCmd "docker push ${env.DOCKER_REGISTRY}/sms-eureka-server:${env.IMAGE_TAG}"
+                        runCmd "docker push ${env.DOCKER_REGISTRY}/sms-eureka-server:latest"
 
-                runCmd "docker push ${env.DOCKER_REGISTRY}/sms-api-gateway:${env.IMAGE_TAG}"
-                runCmd "docker push ${env.DOCKER_REGISTRY}/sms-api-gateway:latest"
+                        runCmd "docker push ${env.DOCKER_REGISTRY}/sms-api-gateway:${env.IMAGE_TAG}"
+                        runCmd "docker push ${env.DOCKER_REGISTRY}/sms-api-gateway:latest"
 
-                runCmd "docker push ${env.DOCKER_REGISTRY}/sms-auth-service:${env.IMAGE_TAG}"
-                runCmd "docker push ${env.DOCKER_REGISTRY}/sms-auth-service:latest"
+                        runCmd "docker push ${env.DOCKER_REGISTRY}/sms-auth-service:${env.IMAGE_TAG}"
+                        runCmd "docker push ${env.DOCKER_REGISTRY}/sms-auth-service:latest"
 
-                runCmd "docker push ${env.DOCKER_REGISTRY}/sms-inventory-service:${env.IMAGE_TAG}"
-                runCmd "docker push ${env.DOCKER_REGISTRY}/sms-inventory-service:latest"
+                        runCmd "docker push ${env.DOCKER_REGISTRY}/sms-inventory-service:${env.IMAGE_TAG}"
+                        runCmd "docker push ${env.DOCKER_REGISTRY}/sms-inventory-service:latest"
 
-                runCmd "docker push ${env.DOCKER_REGISTRY}/sms-request-service:${env.IMAGE_TAG}"
-                runCmd "docker push ${env.DOCKER_REGISTRY}/sms-request-service:latest"
+                        runCmd "docker push ${env.DOCKER_REGISTRY}/sms-request-service:${env.IMAGE_TAG}"
+                        runCmd "docker push ${env.DOCKER_REGISTRY}/sms-request-service:latest"
 
-                runCmd "docker push ${env.DOCKER_REGISTRY}/sms-frontend:${env.IMAGE_TAG}"
-                runCmd "docker push ${env.DOCKER_REGISTRY}/sms-frontend:latest"
+                        runCmd "docker push ${env.DOCKER_REGISTRY}/sms-frontend:${env.IMAGE_TAG}"
+                        runCmd "docker push ${env.DOCKER_REGISTRY}/sms-frontend:latest"
+                    }
+                }
             }
         }
 
@@ -291,9 +331,17 @@ pipeline {
     // ──────────────────────────────────────────────────────
     post {
         always {
-            echo '🧹 Cleaning up workspace...'
-            runCmd "docker logout ${env.DOCKER_REGISTRY} || exit 0"
-            cleanWs()
+            script {
+                try {
+                    echo '🧹 Cleaning up workspace...'
+                    if (env.HAS_CREDS == 'true' && env.HAS_REGISTRY == 'true') {
+                        runCmd "docker logout ${env.DOCKER_REGISTRY} || exit 0"
+                    }
+                    cleanWs()
+                } catch (Throwable t) {
+                    echo "⚠️ Could not perform workspace cleanup: ${t.getMessage()}"
+                }
+            }
         }
         success {
             echo '✅ ========================================='
