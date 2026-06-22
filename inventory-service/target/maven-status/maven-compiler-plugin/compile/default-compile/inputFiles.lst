@@ -1,12 +1,13 @@
 E:\stationery-management\inventory-service\src\main\java\com\stationery\inventory\exception\ErrorResponse.java
 E:\stationery-management\inventory-service\src\main\java\com\stationery\inventory\repository\StationeryItemRepository.java
-E:\stationery-management\inventory-service\src\main\java\com\stationery\inventory\exception\ResourceNotFoundException.java
 E:\stationery-management\inventory-service\src\main\java\com\stationery\inventory\model\StationeryItem.java
 E:\stationery-management\inventory-service\src\main\java\com\stationery\inventory\controller\InventoryController.java
-E:\stationery-management\inventory-service\src\main\java\com\stationery\inventory\dto\StationeryItemRequest.java
 E:\stationery-management\inventory-service\src\main\java\com\stationery\inventory\exception\InsufficientStockException.java
 E:\stationery-management\inventory-service\src\main\java\com\stationery\inventory\service\InventoryService.java
 E:\stationery-management\inventory-service\src\main\java\com\stationery\inventory\model\Category.java
 E:\stationery-management\inventory-service\src\main\java\com\stationery\inventory\exception\GlobalExceptionHandler.java
 E:\stationery-management\inventory-service\src\main\java\com\stationery\inventory\dto\StationeryItemResponse.java
+E:\stationery-management\inventory-service\src\main\java\com\stationery\inventory\exception\ResourceNotFoundException.java
+E:\stationery-management\inventory-service\src\main\java\com\stationery\inventory\dto\StationeryItemRequest.java
+E:\stationery-management\inventory-service\src\main\java\com\stationery\inventory\service\AuditLogger.java
 E:\stationery-management\inventory-service\src\main\java\com\stationery\inventory\InventoryServiceApplication.java

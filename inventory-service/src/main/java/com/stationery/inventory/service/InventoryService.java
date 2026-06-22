@@ -29,9 +29,11 @@ public class InventoryService {
     private static final Logger log = LoggerFactory.getLogger(InventoryService.class);
 
     private final StationeryItemRepository stationeryItemRepository;
+    private final AuditLogger auditLogger;
 
-    public InventoryService(StationeryItemRepository stationeryItemRepository) {
+    public InventoryService(StationeryItemRepository stationeryItemRepository, AuditLogger auditLogger) {
         this.stationeryItemRepository = stationeryItemRepository;
+        this.auditLogger = auditLogger;
     }
 
     /**
@@ -43,7 +45,20 @@ public class InventoryService {
      */
     @Transactional
     public StationeryItemResponse createItem(StationeryItemRequest request) {
-        log.info("AUDIT: Creating new stationery item with name: '{}'", request.getName());
+        return createItem(request, "SYSTEM", "ADMIN");
+    }
+
+    /**
+     * Creates a new stationery item in the inventory with audit logging.
+     *
+     * @param request     the item creation request
+     * @param performedBy the user who performed the action
+     * @param userRole    the role of the user
+     * @return the created item response
+     */
+    @Transactional
+    public StationeryItemResponse createItem(StationeryItemRequest request, String performedBy, String userRole) {
+        log.info("AUDIT: Creating new stationery item with name: '{}' by user: '{}'", request.getName(), performedBy);
 
         StationeryItem item = StationeryItem.builder()
                 .name(request.getName())
@@ -57,6 +72,14 @@ public class InventoryService {
         StationeryItem savedItem = stationeryItemRepository.save(item);
         log.info("AUDIT: Successfully created stationery item with ID: {}, name: '{}'",
                 savedItem.getId(), savedItem.getName());
+
+        auditLogger.log(
+                "ITEM_CREATED",
+                performedBy,
+                userRole,
+                String.format("Created stationery item: %s (ID: %d) in category: %s with initial quantity: %d",
+                        savedItem.getName(), savedItem.getId(), savedItem.getCategory(), savedItem.getAvailableQuantity())
+        );
 
         return mapToResponse(savedItem);
     }
@@ -126,28 +149,63 @@ public class InventoryService {
      */
     @Transactional
     public StationeryItemResponse updateItem(Long id, StationeryItemRequest request) {
-        log.info("AUDIT: Updating stationery item with ID: {}", id);
+        return updateItem(id, request, "SYSTEM", "ADMIN");
+    }
+
+    /**
+     * Updates an existing stationery item with audit logging.
+     *
+     * @param id          the item ID to update
+     * @param request     the update request
+     * @param performedBy the user who performed the action
+     * @param userRole    the role of the user
+     * @return the updated item response
+     * @throws ResourceNotFoundException if the item is not found
+     */
+    @Transactional
+    public StationeryItemResponse updateItem(Long id, StationeryItemRequest request, String performedBy, String userRole) {
+        log.info("AUDIT: Updating stationery item with ID: {} by user: '{}'", id, performedBy);
 
         StationeryItem existingItem = stationeryItemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Stationery item not found with ID: " + id));
 
+        // Build details explaining exactly what was updated
+        StringBuilder detailsBuilder = new StringBuilder("Updated stationery item '" + existingItem.getName() + "' (ID: " + id + "):");
+        boolean changesFound = false;
+
         // Log field-level changes for audit trail
         if (!existingItem.getName().equals(request.getName())) {
             log.info("AUDIT: Item ID {} - name changed from '{}' to '{}'",
                     id, existingItem.getName(), request.getName());
+            detailsBuilder.append(" [Name: '").append(existingItem.getName()).append("' -> '").append(request.getName()).append("']");
+            changesFound = true;
         }
         if (!existingItem.getCategory().equals(request.getCategory().toUpperCase())) {
             log.info("AUDIT: Item ID {} - category changed from '{}' to '{}'",
                     id, existingItem.getCategory(), request.getCategory().toUpperCase());
+            detailsBuilder.append(" [Category: '").append(existingItem.getCategory()).append("' -> '").append(request.getCategory().toUpperCase()).append("']");
+            changesFound = true;
         }
         if (!existingItem.getAvailableQuantity().equals(request.getAvailableQuantity())) {
             log.info("AUDIT: Item ID {} - availableQuantity changed from {} to {}",
                     id, existingItem.getAvailableQuantity(), request.getAvailableQuantity());
+            detailsBuilder.append(" [Quantity: ").append(existingItem.getAvailableQuantity()).append(" -> ").append(request.getAvailableQuantity()).append("]");
+            changesFound = true;
         }
         if (!existingItem.getMinimumQuantity().equals(request.getMinimumQuantity())) {
             log.info("AUDIT: Item ID {} - minimumQuantity changed from {} to {}",
                     id, existingItem.getMinimumQuantity(), request.getMinimumQuantity());
+            detailsBuilder.append(" [Min Quantity: ").append(existingItem.getMinimumQuantity()).append(" -> ").append(request.getMinimumQuantity()).append("]");
+            changesFound = true;
+        }
+        if (existingItem.getDescription() == null || !existingItem.getDescription().equals(request.getDescription())) {
+            detailsBuilder.append(" [Description changed]");
+            changesFound = true;
+        }
+
+        if (!changesFound) {
+            detailsBuilder.append(" No visible changes made.");
         }
 
         existingItem.setName(request.getName());
@@ -159,6 +217,13 @@ public class InventoryService {
 
         StationeryItem updatedItem = stationeryItemRepository.save(existingItem);
         log.info("AUDIT: Successfully updated stationery item with ID: {}", id);
+
+        auditLogger.log(
+                "ITEM_UPDATED",
+                performedBy,
+                userRole,
+                detailsBuilder.toString()
+        );
 
         return mapToResponse(updatedItem);
     }
@@ -172,7 +237,20 @@ public class InventoryService {
      */
     @Transactional
     public void deleteItem(Long id) {
-        log.info("AUDIT: Attempting to delete stationery item with ID: {}", id);
+        deleteItem(id, "SYSTEM", "ADMIN");
+    }
+
+    /**
+     * Deletes a stationery item from the inventory with audit logging.
+     *
+     * @param id          the item ID to delete
+     * @param performedBy the user who performed the action
+     * @param userRole    the role of the user
+     * @throws ResourceNotFoundException if the item is not found
+     */
+    @Transactional
+    public void deleteItem(Long id, String performedBy, String userRole) {
+        log.info("AUDIT: Attempting to delete stationery item with ID: {} by user: '{}'", id, performedBy);
 
         StationeryItem item = stationeryItemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -181,6 +259,14 @@ public class InventoryService {
         stationeryItemRepository.delete(item);
         log.info("AUDIT: Successfully deleted stationery item with ID: {}, name: '{}'",
                 id, item.getName());
+
+        auditLogger.log(
+                "ITEM_DELETED",
+                performedBy,
+                userRole,
+                String.format("Deleted stationery item: %s (ID: %d) from category: %s",
+                        item.getName(), item.getId(), item.getCategory())
+        );
     }
 
     /**

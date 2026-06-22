@@ -5,6 +5,7 @@ import './Requests.css';
 const ManageRequests = () => {
   const [requests, setRequests] = useState([]);
   const [status, setStatus] = useState('');
+  const [sortBy, setSortBy] = useState('dateDesc');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -28,6 +29,28 @@ const ManageRequests = () => {
   useEffect(() => {
     loadRequests();
   }, [status]);
+
+  const getSortedRequests = () => {
+    return [...requests].sort((a, b) => {
+      if (sortBy === 'dateDesc') {
+        return new Date(b.createdAt || b.updatedAt || 0) - new Date(a.createdAt || a.updatedAt || 0);
+      }
+      if (sortBy === 'dateAsc') {
+        return new Date(a.createdAt || a.updatedAt || 0) - new Date(b.createdAt || b.updatedAt || 0);
+      }
+      if (sortBy === 'nameAsc') {
+        const nameA = a.studentUsername || '';
+        const nameB = b.studentUsername || '';
+        return nameA.localeCompare(nameB);
+      }
+      if (sortBy === 'nameDesc') {
+        const nameA = a.studentUsername || '';
+        const nameB = b.studentUsername || '';
+        return nameB.localeCompare(nameA);
+      }
+      return 0;
+    });
+  };
 
   const updateRequest = async (id, action) => {
     setMessage('');
@@ -74,6 +97,16 @@ const ManageRequests = () => {
             <option value="FULFILLED">Fulfilled</option>
           </select>
         </label>
+
+        <label>
+          Sort by
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            <option value="dateDesc">Date (Newest First)</option>
+            <option value="dateAsc">Date (Oldest First)</option>
+            <option value="nameAsc">Student Username (A-Z)</option>
+            <option value="nameDesc">Student Username (Z-A)</option>
+          </select>
+        </label>
       </div>
 
       {message && <div className="alert alert-success">{message}</div>}
@@ -93,7 +126,7 @@ const ManageRequests = () => {
           </thead>
           <tbody>
             {requests.length ? (
-              requests.map((request) => (
+              getSortedRequests().map((request) => (
                 <tr key={request.id}>
                   <td>{request.id}</td>
                   <td>{request.requestId}</td>

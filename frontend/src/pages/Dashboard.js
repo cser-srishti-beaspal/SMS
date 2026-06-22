@@ -10,6 +10,8 @@ const Dashboard = () => {
   const [error, setError] = useState('');
   const [lowStockItems, setLowStockItems] = useState([]);
   const [showLowStock, setShowLowStock] = useState(false);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [showAuditLogs, setShowAuditLogs] = useState(false);
   const [stats, setStats] = useState({
     totalItems: 0,
     lowStock: 0,
@@ -45,6 +47,13 @@ const Dashboard = () => {
           pendingRequests = Number(
             allRequests.data?.filter((request) => request.status === 'PENDING')?.length ?? 0
           );
+
+          try {
+            const auditResponse = await api.get('/api/requests/audit-logs');
+            setAuditLogs(auditResponse.data ?? []);
+          } catch (auditErr) {
+            console.error('Failed to load audit logs:', auditErr);
+          }
         } else {
           const myResponse = await api.get('/api/requests/my');
           myRequests = Number(myResponse.data?.length ?? 0);
@@ -130,6 +139,27 @@ const Dashboard = () => {
                 ▶ Manage Requests
               </span>
             </div>
+
+            {/* System Audit Logs card */}
+            <div 
+              className="stat-card" 
+              onClick={() => setShowAuditLogs(!showAuditLogs)}
+              style={{
+                cursor: 'pointer',
+                borderColor: showAuditLogs ? 'var(--accent-primary)' : '',
+                boxShadow: showAuditLogs ? 'var(--shadow-glow-primary)' : '',
+                background: showAuditLogs ? 'var(--bg-card-hover)' : ''
+              }}
+              title="Click to toggle details of system audit logs"
+            >
+              <div className="stat-label">System Audit Logs 📋</div>
+              <div className="stat-value" style={{ color: 'var(--text-primary)' }}>
+                {auditLogs.length}
+              </div>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                {showAuditLogs ? '▼ Hide Logs' : '▶ View Logs'}
+              </span>
+            </div>
           </>
         ) : (
           <>
@@ -201,6 +231,68 @@ const Dashboard = () => {
                       <td style={{ color: '#f87171', fontWeight: 'bold' }}>{item.availableQuantity}</td>
                       <td>{item.minimumQuantity}</td>
                       <td>{item.unit}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {showAuditLogs && user?.role === 'ADMIN' && (
+        <div className="audit-logs-detail-panel fade-in" style={{
+          marginTop: '1.5rem',
+          padding: '1.5rem',
+          background: 'rgba(255, 255, 255, 0.02)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: 'var(--radius-lg)',
+          backdropFilter: 'blur(16px)',
+          animation: 'fadeIn 0.3s ease'
+        }}>
+          <h2 style={{ fontSize: '1.2rem', marginBottom: '1rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            📋 System Audit Logs
+          </h2>
+          {auditLogs.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)' }}>No audit logs available.</p>
+          ) : (
+            <div className="table-wrapper" style={{ maxHeight: '500px', overflowY: 'auto' }}>
+              <table className="data-table" style={{ minWidth: '100%' }}>
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Action (What)</th>
+                    <th>Performed By (Who)</th>
+                    <th>Details (Why/What changed)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditLogs.map((log) => (
+                    <tr key={log.id}>
+                      <td style={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
+                        {log.createdTime ? new Date(log.createdTime).toLocaleString() : '—'}
+                      </td>
+                      <td>
+                        <span className={`status-badge status-${log.action.toLowerCase()}`} style={{
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '4px',
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold',
+                          textTransform: 'uppercase',
+                          background: log.action.includes('APPROVED') ? 'rgba(52, 211, 153, 0.1)' : 
+                                      log.action.includes('REJECTED') ? 'rgba(248, 113, 113, 0.1)' : 
+                                      log.action.includes('CREATED') ? 'rgba(96, 165, 250, 0.1)' : 'rgba(251, 191, 36, 0.1)',
+                          color: log.action.includes('APPROVED') ? '#34d399' : 
+                                 log.action.includes('REJECTED') ? '#f87171' : 
+                                 log.action.includes('CREATED') ? '#60a5fa' : '#fbbf24'
+                        }}>
+                          {log.action}
+                        </span>
+                      </td>
+                      <td style={{ fontWeight: 'bold' }}>
+                        {log.performedBy} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>({log.userRole})</span>
+                      </td>
+                      <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{log.details}</td>
                     </tr>
                   ))}
                 </tbody>

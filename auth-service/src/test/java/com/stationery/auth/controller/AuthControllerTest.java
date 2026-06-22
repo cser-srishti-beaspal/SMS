@@ -38,7 +38,7 @@ class AuthControllerTest {
         registerRequest.setRole("STUDENT");
 
         loginRequest = new LoginRequest();
-        loginRequest.setUsername("testuser");
+        loginRequest.setEmail("test@example.com");
         loginRequest.setPassword("password123");
 
         authResponse = AuthResponse.builder()

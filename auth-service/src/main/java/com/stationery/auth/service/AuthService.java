@@ -1,12 +1,5 @@
 package com.stationery.auth.service;
 
-import com.stationery.auth.dto.AuthResponse;
-import com.stationery.auth.dto.LoginRequest;
-import com.stationery.auth.dto.RegisterRequest;
-import com.stationery.auth.model.Role;
-import com.stationery.auth.model.User;
-import com.stationery.auth.repository.UserRepository;
-import com.stationery.auth.security.JwtUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -14,6 +7,14 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import com.stationery.auth.dto.AuthResponse;
+import com.stationery.auth.dto.LoginRequest;
+import com.stationery.auth.dto.RegisterRequest;
+import com.stationery.auth.model.Role;
+import com.stationery.auth.model.User;
+import com.stationery.auth.repository.UserRepository;
+import com.stationery.auth.security.JwtUtil;
 
 /**
  * Service handling user registration, login, and token validation logic.
@@ -25,17 +26,20 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtUtil jwtUtil;
-    private final AuthenticationManager authenticationManager;
+    private final JwtUtil jwtUtil; // Handles token generation and validation.
+    private final AuthenticationManager authenticationManager;//Spring Security's built-in component that verifies user credentials during login.
+    private final AuditLogger auditLogger; // A helper class that logs security events (like login/registration) to a log file or audit database.
 
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
                        JwtUtil jwtUtil,
-                       AuthenticationManager authenticationManager) {
+                       AuthenticationManager authenticationManager,
+                       AuditLogger auditLogger) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
         this.authenticationManager = authenticationManager;
+        this.auditLogger = auditLogger;
     }
 
     /**
@@ -62,7 +66,7 @@ public class AuthService {
 
         Role role;
         try {
-            role = Role.valueOf(request.getRole().toUpperCase());
+            role = Role.valueOf(request.getRole().toUpperCase());//convert string -> enum
         } catch (IllegalArgumentException e) {
             logger.warn("Invalid role provided: {}, defaulting to STUDENT", request.getRole());
             role = Role.STUDENT;
@@ -71,12 +75,14 @@ public class AuthService {
         User user = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
+                .password(passwordEncoder.encode(request.getPassword()))// ENCRYPT PASSWORD
                 .role(role)
                 .build();
 
         userRepository.save(user);
         logger.info("User registered successfully: {}", user.getUsername());
+
+        auditLogger.log("USER_REGISTRATION", user.getUsername(), user.getRole().name(), "Successfully registered account with email: " + user.getEmail());
 
         String token = jwtUtil.generateToken(user.getUsername(), user.getRole().name());
 
@@ -95,21 +101,24 @@ public class AuthService {
      * @return an AuthResponse containing the JWT token and user details
      */
     public AuthResponse login(LoginRequest request) {
-        logger.info("Attempting login for user: {}", request.getUsername());
+        logger.info("Attempting login for email: {}", request.getEmail());
 
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
-                        request.getUsername(),
+                        request.getEmail(),
                         request.getPassword()
                 )
         );
 
-        logger.info("User authenticated successfully: {}", request.getUsername());
+        logger.info("User authenticated successfully: {}", request.getEmail());
 
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found: " + request.getUsername()));
+        User user = userRepository.findByEmail(request.getEmail())
+                .or(() -> userRepository.findByUsername(request.getEmail()))
+                .orElseThrow(() -> new RuntimeException("User not found: " + request.getEmail()));
 
         String token = jwtUtil.generateToken(user.getUsername(), user.getRole().name());
+
+        auditLogger.log("USER_LOGIN", user.getUsername(), user.getRole().name(), "Successfully authenticated using email: " + user.getEmail());
 
         return AuthResponse.builder()
                 .token(token)

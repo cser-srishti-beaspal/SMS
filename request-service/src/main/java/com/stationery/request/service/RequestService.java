@@ -7,8 +7,10 @@ import com.stationery.request.dto.RequestResponse;
 import com.stationery.request.exception.InsufficientStockException;
 import com.stationery.request.exception.ResourceNotFoundException;
 import com.stationery.request.model.RequestItem;
+import com.stationery.request.model.AuditLog;
 import com.stationery.request.model.RequestStatus;
 import com.stationery.request.model.StationeryRequest;
+import com.stationery.request.repository.AuditLogRepository;
 import com.stationery.request.repository.RequestRepository;
 import feign.FeignException;
 import org.slf4j.Logger;
@@ -26,10 +28,14 @@ public class RequestService {
 
     private final RequestRepository requestRepository;
     private final InventoryClient inventoryClient;
+    private final AuditLogRepository auditLogRepository;
 
-    public RequestService(RequestRepository requestRepository, InventoryClient inventoryClient) {
+    public RequestService(RequestRepository requestRepository, 
+                          InventoryClient inventoryClient,
+                          AuditLogRepository auditLogRepository) {
         this.requestRepository = requestRepository;
         this.inventoryClient = inventoryClient;
+        this.auditLogRepository = auditLogRepository;
     }
 
     /**
@@ -57,6 +63,15 @@ public class RequestService {
         StationeryRequest savedRequest = requestRepository.save(request);
         log.info("AUDIT: Stationery request created successfully. RequestId: {}, Student: {}, Items: {}",
                 savedRequest.getRequestId(), username, createRequestDto.getItems().size());
+
+        auditLogRepository.save(new AuditLog(
+                "REQUEST_CREATED", 
+                username, 
+                "STUDENT",
+                "Created stationery request with ID: " + savedRequest.getRequestId() + " containing " + createRequestDto.getItems().size() + " items.",
+                savedRequest.getCreatedAt(),
+                savedRequest.getUpdatedAt()
+        ));
 
         return mapToResponse(savedRequest);
     }
@@ -172,6 +187,15 @@ public class RequestService {
         log.info("AUDIT: Request ID: {} approved by admin '{}'. All inventory deductions successful.",
                 id, adminUsername);
 
+        auditLogRepository.save(new AuditLog(
+                "REQUEST_APPROVED", 
+                adminUsername, 
+                "ADMIN",
+                "Approved request ID: " + savedRequest.getRequestId() + " (DB ID: " + id + ") for student: " + savedRequest.getStudentUsername(),
+                savedRequest.getCreatedAt(),
+                savedRequest.getUpdatedAt()
+        ));
+
         return mapToResponse(savedRequest);
     }
 
@@ -197,6 +221,15 @@ public class RequestService {
 
         log.info("AUDIT: Request ID: {} rejected by admin '{}'.", id, adminUsername);
 
+        auditLogRepository.save(new AuditLog(
+                "REQUEST_REJECTED", 
+                adminUsername, 
+                "ADMIN",
+                "Rejected request ID: " + savedRequest.getRequestId() + " (DB ID: " + id + ") for student: " + savedRequest.getStudentUsername() + ". Reason: " + reason,
+                savedRequest.getCreatedAt(),
+                savedRequest.getUpdatedAt()
+        ));
+
         return mapToResponse(savedRequest);
     }
 
@@ -219,6 +252,15 @@ public class RequestService {
         StationeryRequest savedRequest = requestRepository.save(request);
 
         log.info("AUDIT: Request ID: {} fulfilled successfully.", id);
+
+        auditLogRepository.save(new AuditLog(
+                "REQUEST_FULFILLED", 
+                "SYSTEM", 
+                "SYSTEM",
+                "Fulfilled request ID: " + savedRequest.getRequestId() + " (DB ID: " + id + ") for student: " + savedRequest.getStudentUsername(),
+                savedRequest.getCreatedAt(),
+                savedRequest.getUpdatedAt()
+        ));
 
         return mapToResponse(savedRequest);
     }
@@ -255,4 +297,28 @@ public class RequestService {
                 .updatedAt(request.getUpdatedAt())
                 .build();
     }
+
+    /**
+     * Save an audit log from other services or actions.
+     */
+    @Transactional
+    public AuditLog saveAuditLog(AuditLog auditLog) {
+        log.info("Saving external audit log for action: {} by: {}", auditLog.getAction(), auditLog.getPerformedBy());
+        if (auditLog.getCreatedTime() == null) {
+            auditLog.setCreatedTime(java.time.LocalDateTime.now());
+        }
+        if (auditLog.getUpdatedTime() == null) {
+            auditLog.setUpdatedTime(java.time.LocalDateTime.now());
+        }
+        return auditLogRepository.save(auditLog);
+    }
+
+    /**
+     * Get all audit logs sorted by timestamp descending.
+     */
+    @Transactional(readOnly = true)
+    public List<AuditLog> getAuditLogs() {
+        return auditLogRepository.findAllByOrderByIdDesc();
+    }
 }
+

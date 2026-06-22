@@ -2,6 +2,7 @@ E:\stationery-management\auth-service\src\main\java\com\stationery\auth\model\Ro
 E:\stationery-management\auth-service\src\main\java\com\stationery\auth\security\JwtUtil.java
 E:\stationery-management\auth-service\src\main\java\com\stationery\auth\security\SecurityConfig.java
 E:\stationery-management\auth-service\src\main\java\com\stationery\auth\dto\RegisterRequest.java
+E:\stationery-management\auth-service\src\main\java\com\stationery\auth\service\AuditLogger.java
 E:\stationery-management\auth-service\src\main\java\com\stationery\auth\exception\GlobalExceptionHandler.java
 E:\stationery-management\auth-service\src\main\java\com\stationery\auth\dto\AuthResponse.java
 E:\stationery-management\auth-service\src\main\java\com\stationery\auth\dto\LoginRequest.java
@@ -9,6 +10,7 @@ E:\stationery-management\auth-service\src\main\java\com\stationery\auth\exceptio
 E:\stationery-management\auth-service\src\main\java\com\stationery\auth\security\CustomUserDetailsService.java
 E:\stationery-management\auth-service\src\main\java\com\stationery\auth\AuthServiceApplication.java
 E:\stationery-management\auth-service\src\main\java\com\stationery\auth\model\User.java
+E:\stationery-management\auth-service\src\main\java\com\stationery\auth\config\DatabaseSeeder.java
 E:\stationery-management\auth-service\src\main\java\com\stationery\auth\controller\AuthController.java
 E:\stationery-management\auth-service\src\main\java\com\stationery\auth\service\AuthService.java
 E:\stationery-management\auth-service\src\main\java\com\stationery\auth\repository\UserRepository.java

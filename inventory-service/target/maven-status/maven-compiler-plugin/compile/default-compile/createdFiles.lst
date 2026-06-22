@@ -5,6 +5,7 @@ com\stationery\inventory\service\InventoryService.class
 com\stationery\inventory\exception\ErrorResponse.class
 com\stationery\inventory\model\Category.class
 com\stationery\inventory\model\StationeryItem.class
+com\stationery\inventory\service\AuditLogger.class
 com\stationery\inventory\exception\ResourceNotFoundException.class
 com\stationery\inventory\model\StationeryItem$StationeryItemBuilder.class
 com\stationery\inventory\exception\ErrorResponse$ErrorResponseBuilder.class

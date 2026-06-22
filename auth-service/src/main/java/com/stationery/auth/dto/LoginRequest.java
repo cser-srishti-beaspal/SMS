@@ -1,24 +1,29 @@
 package com.stationery.auth.dto;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
+/**
+ * DTO for user login request.
+ */
 public class LoginRequest {
 
-    @NotBlank(message = "Username is required")
-    private String username;
+    @NotBlank(message = "Email is required")
+    @Email(message = "Email should be valid")
+    private String email;
 
     @NotBlank(message = "Password is required")
     private String password;
 
     public LoginRequest() {}
 
-    public LoginRequest(String username, String password) {
-        this.username = username;
+    public LoginRequest(String email, String password) {
+        this.email = email;
         this.password = password;
     }
 
-    public String getUsername() { return username; }
-    public void setUsername(String username) { this.username = username; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
 
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
@@ -26,14 +31,14 @@ public class LoginRequest {
     public static LoginRequestBuilder builder() { return new LoginRequestBuilder(); }
 
     public static class LoginRequestBuilder {
-        private String username;
+        private String email;
         private String password;
 
-        public LoginRequestBuilder username(String username) { this.username = username; return this; }
+        public LoginRequestBuilder email(String email) { this.email = email; return this; }
         public LoginRequestBuilder password(String password) { this.password = password; return this; }
 
         public LoginRequest build() {
-            return new LoginRequest(username, password);
+            return new LoginRequest(email, password);
         }
     }
 }

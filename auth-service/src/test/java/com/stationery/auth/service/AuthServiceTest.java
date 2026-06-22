@@ -57,7 +57,7 @@ class AuthServiceTest {
         registerRequest.setRole("STUDENT");
 
         loginRequest = new LoginRequest();
-        loginRequest.setUsername("testuser");
+        loginRequest.setEmail("test@example.com");
         loginRequest.setPassword("password123");
 
         sampleUser = User.builder()
@@ -129,7 +129,7 @@ class AuthServiceTest {
         // Arrange
         Authentication mockAuthentication = mock(Authentication.class);
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(mockAuthentication);
-        when(userRepository.findByUsername(loginRequest.getUsername())).thenReturn(Optional.of(sampleUser));
+        when(userRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(sampleUser));
         when(jwtUtil.generateToken("testuser", "STUDENT")).thenReturn("mockedToken");
 
         // Act
@@ -143,7 +143,7 @@ class AuthServiceTest {
         assertEquals("Login successful", response.getMessage());
 
         verify(authenticationManager, times(1)).authenticate(any(UsernamePasswordAuthenticationToken.class));
-        verify(userRepository, times(1)).findByUsername("testuser");
+        verify(userRepository, times(1)).findByEmail("test@example.com");
         verify(jwtUtil, times(1)).generateToken("testuser", "STUDENT");
     }
 
@@ -157,6 +157,7 @@ class AuthServiceTest {
         assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest));
 
         verify(authenticationManager, times(1)).authenticate(any(UsernamePasswordAuthenticationToken.class));
+        verify(userRepository, never()).findByEmail(anyString());
         verify(userRepository, never()).findByUsername(anyString());
         verify(jwtUtil, never()).generateToken(anyString(), anyString());
     }

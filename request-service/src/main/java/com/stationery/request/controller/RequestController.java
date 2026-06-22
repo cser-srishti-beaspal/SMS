@@ -3,6 +3,7 @@ package com.stationery.request.controller;
 import com.stationery.request.dto.ApproveRejectDto;
 import com.stationery.request.dto.CreateRequestDto;
 import com.stationery.request.dto.RequestResponse;
+import com.stationery.request.model.AuditLog;
 import com.stationery.request.service.RequestService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -92,6 +93,29 @@ public class RequestController {
         RequestResponse response = requestService.getRequestByRequestId(requestId);
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Get all system audit logs (ADMIN only).
+     * GET /api/requests/audit-logs
+     */
+    @GetMapping("/audit-logs")
+    public ResponseEntity<List<AuditLog>> getAuditLogs(@RequestHeader("X-User-Role") String role) {
+        log.info("AUDIT: GET /api/requests/audit-logs - Fetching audit logs. Role: {}", role);
+        validateRole(role, "ADMIN");
+        return ResponseEntity.ok(requestService.getAuditLogs());
+    }
+
+    /**
+     * Create a new audit log.
+     * POST /api/requests/audit-logs
+     */
+    @PostMapping("/audit-logs")
+    public ResponseEntity<AuditLog> createAuditLog(@RequestBody AuditLog auditLog) {
+        log.info("AUDIT: POST /api/requests/audit-logs - Action: {}, PerformedBy: {}", auditLog.getAction(), auditLog.getPerformedBy());
+        AuditLog savedLog = requestService.saveAuditLog(auditLog);
+        return new ResponseEntity<>(savedLog, HttpStatus.CREATED);
+    }
+
 
     /**
      * Get all requests (ADMIN only), optionally filtered by status.

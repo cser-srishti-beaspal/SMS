@@ -58,7 +58,7 @@ class InventoryControllerTest {
     @Test
     void createItem_Admin_Success() {
         // Arrange
-        when(inventoryService.createItem(any(StationeryItemRequest.class))).thenReturn(sampleResponse);
+        when(inventoryService.createItem(any(StationeryItemRequest.class), anyString(), anyString())).thenReturn(sampleResponse);
 
         // Act
         ResponseEntity<StationeryItemResponse> response = inventoryController.createItem(
@@ -67,7 +67,7 @@ class InventoryControllerTest {
         // Assert
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertEquals(sampleResponse, response.getBody());
-        verify(inventoryService, times(1)).createItem(sampleRequest);
+        verify(inventoryService, times(1)).createItem(sampleRequest, "adminUser", "ROLE_ADMIN");
     }
 
     @Test
@@ -130,7 +130,7 @@ class InventoryControllerTest {
     @Test
     void updateItem_Admin_Success() {
         // Arrange
-        when(inventoryService.updateItem(eq(1L), any(StationeryItemRequest.class))).thenReturn(sampleResponse);
+        when(inventoryService.updateItem(eq(1L), any(StationeryItemRequest.class), anyString(), anyString())).thenReturn(sampleResponse);
 
         // Act
         ResponseEntity<StationeryItemResponse> response = inventoryController.updateItem(
@@ -139,7 +139,7 @@ class InventoryControllerTest {
         // Assert
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(sampleResponse, response.getBody());
-        verify(inventoryService, times(1)).updateItem(1L, sampleRequest);
+        verify(inventoryService, times(1)).updateItem(1L, sampleRequest, "adminUser", "ADMIN");
     }
 
     @Test
@@ -150,7 +150,7 @@ class InventoryControllerTest {
 
         // Assert
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
-        verify(inventoryService, never()).updateItem(anyLong(), any());
+        verify(inventoryService, never()).updateItem(anyLong(), any(), anyString(), anyString());
     }
 
     @Test
@@ -160,7 +160,7 @@ class InventoryControllerTest {
 
         // Assert
         assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        verify(inventoryService, times(1)).deleteItem(1L);
+        verify(inventoryService, times(1)).deleteItem(1L, "adminUser", "ROLE_ADMIN");
     }
 
     @Test

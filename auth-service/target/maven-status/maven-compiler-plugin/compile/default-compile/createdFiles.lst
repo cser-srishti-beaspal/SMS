@@ -2,10 +2,12 @@ com\stationery\auth\dto\AuthResponse$AuthResponseBuilder.class
 com\stationery\auth\model\Role.class
 com\stationery\auth\dto\RegisterRequest.class
 com\stationery\auth\exception\ErrorResponse.class
+com\stationery\auth\config\DatabaseSeeder.class
 com\stationery\auth\dto\RegisterRequest$RegisterRequestBuilder.class
 com\stationery\auth\security\JwtUtil.class
 com\stationery\auth\security\CustomUserDetailsService.class
 com\stationery\auth\repository\UserRepository.class
+com\stationery\auth\service\AuditLogger.class
 com\stationery\auth\AuthServiceApplication.class
 com\stationery\auth\exception\GlobalExceptionHandler.class
 com\stationery\auth\controller\AuthController.class

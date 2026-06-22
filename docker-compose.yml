@@ -141,6 +141,7 @@ services:
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SERVICES_REQUEST_SERVICE_URL: http://request-service:8083
     networks:
       - sms-network
     healthcheck:
@@ -175,6 +176,7 @@ services:
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SERVICES_REQUEST_SERVICE_URL: http://request-service:8083
     networks:
       - sms-network
     healthcheck:
@@ -235,7 +237,7 @@ services:
       api-gateway:
         condition: service_healthy
     environment:
-      REACT_APP_API_BASE_URL: http://localhost:8090
+      REACT_APP_API_URL: http://localhost:8090
     networks:
       - sms-network
 

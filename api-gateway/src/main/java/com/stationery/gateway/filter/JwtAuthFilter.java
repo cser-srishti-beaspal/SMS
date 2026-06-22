@@ -1,8 +1,10 @@
 package com.stationery.gateway.filter;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+import javax.crypto.SecretKey;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,11 +17,11 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
-import reactor.core.publisher.Mono;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import reactor.core.publisher.Mono;
 
 /**
  * Global JWT Authentication Filter for the API Gateway.
@@ -58,6 +60,10 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
     private String jwtSecret;
 
     @Override
+    // A  Mono<Void>  represents a promise that will eventually resolve to an empty/completed
+    // state. This is required because Spring Cloud Gateway is reactive and asynchronous.Return Empty signal when done processing req
+    // ServerWebExchange : Represents the current HTTP request/response exchange in reactive applications
+    // GatewayFilterChain : The chain of filters. Calling  chain.filter(...)  means "pass this request to the next filter in line".
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getURI().getPath();
@@ -111,6 +117,8 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
     }
 
     @Override
+    // Returns  -1 . In Spring, smaller numbers represent higher priorities. By setting this to  -1 , we tell Spring Cloud Gateway to execute our
+    // security filter before any other routing or processing occurs.
     public int getOrder() {
         return -1;
     }

@@ -4,6 +4,7 @@ import com.stationery.request.dto.ApproveRejectDto;
 import com.stationery.request.dto.CreateRequestDto;
 import com.stationery.request.dto.RequestItemDto;
 import com.stationery.request.dto.RequestResponse;
+import com.stationery.request.model.AuditLog;
 import com.stationery.request.service.RequestService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -230,4 +231,22 @@ class RequestControllerTest {
         });
         assertEquals("Access denied. Role is null", exception.getMessage());
     }
+
+    @Test
+    void createAuditLog_Success() {
+        // Arrange
+        AuditLog inputLog = new AuditLog("USER_LOGIN", "user1", "STUDENT", "Login success", null, null);
+        AuditLog savedLog = new AuditLog("USER_LOGIN", "user1", "STUDENT", "Login success", null, null);
+        savedLog.setId(10L);
+        when(requestService.saveAuditLog(inputLog)).thenReturn(savedLog);
+
+        // Act
+        ResponseEntity<AuditLog> response = requestController.createAuditLog(inputLog);
+
+        // Assert
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertEquals(savedLog, response.getBody());
+        verify(requestService, times(1)).saveAuditLog(inputLog);
+    }
 }
+

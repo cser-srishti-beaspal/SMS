@@ -1,9 +1,19 @@
 package com.stationery.auth.model;
+//JPA annotations import ho rahe hain 
+import java.time.LocalDateTime;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
@@ -68,13 +78,15 @@ public class User {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
-
+    // tells the persistence provider (like Hibernate) to execute the annotated method just before a new record is inserted into the
+    // database for the first time (i.e., before an SQL  INSERT  statement is run).
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
-
+    // It tells the persistence provider to execute the annotated method just before an existing record is updated in the database (i.e.,
+    // before an SQL  UPDATE  statement is run).
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

@@ -5,6 +5,7 @@ import './Requests.css';
 const MyRequests = () => {
   const [requests, setRequests] = useState([]);
   const [status, setStatus] = useState('');
+  const [sortBy, setSortBy] = useState('dateDesc');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -28,6 +29,28 @@ const MyRequests = () => {
     loadRequests();
   }, [status]);
 
+  const getSortedRequests = () => {
+    return [...requests].sort((a, b) => {
+      if (sortBy === 'dateDesc') {
+        return new Date(b.createdAt || b.updatedAt || 0) - new Date(a.createdAt || a.updatedAt || 0);
+      }
+      if (sortBy === 'dateAsc') {
+        return new Date(a.createdAt || a.updatedAt || 0) - new Date(b.createdAt || b.updatedAt || 0);
+      }
+      if (sortBy === 'nameAsc') {
+        const nameA = (a.items && a.items[0]?.itemName) || '';
+        const nameB = (b.items && b.items[0]?.itemName) || '';
+        return nameA.localeCompare(nameB);
+      }
+      if (sortBy === 'nameDesc') {
+        const nameA = (a.items && a.items[0]?.itemName) || '';
+        const nameB = (b.items && b.items[0]?.itemName) || '';
+        return nameB.localeCompare(nameA);
+      }
+      return 0;
+    });
+  };
+
   return (
     <div className="page-card">
       <div className="page-header">
@@ -46,6 +69,16 @@ const MyRequests = () => {
             <option value="APPROVED">Approved</option>
             <option value="REJECTED">Rejected</option>
             <option value="FULFILLED">Fulfilled</option>
+          </select>
+        </label>
+
+        <label>
+          Sort by
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            <option value="dateDesc">Date (Newest First)</option>
+            <option value="dateAsc">Date (Oldest First)</option>
+            <option value="nameAsc">Item Name (A-Z)</option>
+            <option value="nameDesc">Item Name (Z-A)</option>
           </select>
         </label>
       </div>
@@ -67,7 +100,7 @@ const MyRequests = () => {
           </thead>
           <tbody>
             {requests.length ? (
-              requests.map((request) => (
+              getSortedRequests().map((request) => (
                 <tr key={request.id}>
                   <td>{request.id}</td>
                   <td>{request.requestId}</td>

@@ -5,9 +5,11 @@ import com.stationery.request.dto.CreateRequestDto;
 import com.stationery.request.dto.RequestItemDto;
 import com.stationery.request.dto.RequestResponse;
 import com.stationery.request.exception.ResourceNotFoundException;
+import com.stationery.request.model.AuditLog;
 import com.stationery.request.model.RequestItem;
 import com.stationery.request.model.RequestStatus;
 import com.stationery.request.model.StationeryRequest;
+import com.stationery.request.repository.AuditLogRepository;
 import com.stationery.request.repository.RequestRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,6 +47,9 @@ class RequestServiceTest {
 
     @Mock
     private InventoryClient inventoryClient;
+
+    @Mock
+    private AuditLogRepository auditLogRepository;
 
     @InjectMocks
     private RequestService requestService;
@@ -224,4 +229,22 @@ class RequestServiceTest {
         verify(inventoryClient, never()).deductItemQuantity(anyLong(), anyInt());
         verify(requestRepository, never()).save(any(StationeryRequest.class));
     }
+
+    @Test
+    @DisplayName("Should save audit log successfully")
+    void saveAuditLog_Success() {
+        // Arrange
+        AuditLog auditLog = new AuditLog("USER_LOGIN", "user1", "STUDENT", "Login details", null, null);
+        when(auditLogRepository.save(any(AuditLog.class))).thenReturn(auditLog);
+
+        // Act
+        AuditLog savedLog = requestService.saveAuditLog(auditLog);
+
+        // Assert
+        assertNotNull(savedLog);
+        assertEquals("USER_LOGIN", savedLog.getAction());
+        assertEquals("user1", savedLog.getPerformedBy());
+        verify(auditLogRepository, times(1)).save(any(AuditLog.class));
+    }
 }
+

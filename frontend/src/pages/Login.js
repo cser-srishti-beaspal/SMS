@@ -5,7 +5,7 @@ import api from '../api/axiosConfig';
 import './Login.css';
 
 const Login = () => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,7 +24,7 @@ const Login = () => {
     e.preventDefault();
     setError('');
 
-    if (!username.trim() || !password.trim()) {
+    if (!email.trim() || !password.trim()) {
       setError('Please fill in all fields');
       return;
     }
@@ -32,14 +32,14 @@ const Login = () => {
     setLoading(true);
     try {
       const response = await api.post('/api/auth/login', {
-        username: username.trim(),
+        email: email.trim(),
         password,
       });
 
       const data = response.data;
       const token = data.token || data.jwt || data.accessToken;
       const role = data.role || 'STUDENT';
-      const user = data.username || username.trim();
+      const user = data.username || email.trim();
 
       if (token) {
         login(token, user, role);
@@ -86,19 +86,19 @@ const Login = () => {
 
         <form className="login-form" onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label" htmlFor="username">
-              <span className="label-icon">👤</span>
-              Username
+            <label className="form-label" htmlFor="email">
+              <span className="label-icon">✉️</span>
+              Email Address
             </label>
             <input
-              id="username"
-              type="text"
+              id="email"
+              type="email"
               className="form-input"
-              placeholder="Enter your username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter your email address"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               disabled={loading}
-              autoComplete="username"
+              autoComplete="email"
               autoFocus
             />
           </div>
