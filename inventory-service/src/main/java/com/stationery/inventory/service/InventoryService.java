@@ -1,100 +1,111 @@
 package com.stationery.inventory.service;
 
-import com.stationery.inventory.dto.StationeryItemRequest;
-import com.stationery.inventory.dto.StationeryItemResponse;
-import com.stationery.inventory.exception.InsufficientStockException;
-import com.stationery.inventory.exception.ResourceNotFoundException;
-import com.stationery.inventory.model.StationeryItem;
-import com.stationery.inventory.repository.StationeryItemRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.slf4j.Logger;  // Stock kam hone par throw hota hai
+import org.slf4j.LoggerFactory;    // Item na mile toh throw hota hai
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.stereotype.Service;           // Paginated result wrap karta hai
+import org.springframework.transaction.annotation.Transactional;    // Page number + size + sort se Pageable banata hai
 
-import java.util.List;
-import java.util.stream.Collectors;
+import com.stationery.inventory.dto.StationeryItemRequest;       // Pagination info hold karta hai
+import com.stationery.inventory.dto.StationeryItemResponse;           // Sorting direction aur field specify karta hai
+import com.stationery.inventory.exception.InsufficientStockException;
+import com.stationery.inventory.exception.ResourceNotFoundException;
+import com.stationery.inventory.model.StationeryItem;
+import com.stationery.inventory.repository.StationeryItemRepository;
 
 /**
- * Service layer for inventory management operations.
- * Handles CRUD operations, stock management, and search functionality
- * for stationery items. Includes audit logging for all mutating operations.
+ * InventoryService — Stationery items ka poora business logic yahan hai.
+ *
+ * Kya karta hai:
+ *   - CRUD: Create, Read, Update, Delete
+ *   - Stock Management: quantity deduct karna, low stock check
+ *   - Search: keyword se items dhundhna
+ *   - Audit Logging: har mutating operation ka record
+ *
+ * Controller sirf HTTP handle karta hai — asla kaam yahan hota hai.
  */
-@Service
+@Service // Spring ko batata hai: "is class ka bean banao aur inject karo jahan chahiye"
 public class InventoryService {
 
     private static final Logger log = LoggerFactory.getLogger(InventoryService.class);
 
+    // Repository: Database se seedha baat karta hai (SQL queries yahan nahi likhte)
     private final StationeryItemRepository stationeryItemRepository;
+
+    // AuditLogger: Kaun, kya, kab kiya — yeh sab record karta hai
     private final AuditLogger auditLogger;
 
+    // Constructor Injection — field injection (@Autowired) se better: testable + immutable
     public InventoryService(StationeryItemRepository stationeryItemRepository, AuditLogger auditLogger) {
         this.stationeryItemRepository = stationeryItemRepository;
         this.auditLogger = auditLogger;
     }
 
-    /**
-     * Creates a new stationery item in the inventory.
-     * Admin-only operation with audit logging.
-     *
-     * @param request the item creation request
-     * @return the created item response
-     */
+
+    // ─────────────────────────────────────────────────────────────
+    // CREATE ITEM
+    // Do versions hain: ek default (SYSTEM/ADMIN), ek actual logic wala
+    // Yeh pattern Method Overloading hai — same method naam, alag parameters
+    // ─────────────────────────────────────────────────────────────
+
+    // Jab koi user info nahi hai toh SYSTEM/ADMIN default use hota hai
     @Transactional
     public StationeryItemResponse createItem(StationeryItemRequest request) {
-        return createItem(request, "SYSTEM", "ADMIN");
+        return createItem(request, "SYSTEM", "ADMIN"); // Actual method ko delegate karo
     }
 
-    /**
-     * Creates a new stationery item in the inventory with audit logging.
-     *
-     * @param request     the item creation request
-     * @param performedBy the user who performed the action
-     * @param userRole    the role of the user
-     * @return the created item response
-     */
-    @Transactional
+    // Actual create logic — performedBy aur userRole audit trail ke liye
+    @Transactional // Database operation complete ho ya rollback ho — adha kaam nahi
     public StationeryItemResponse createItem(StationeryItemRequest request, String performedBy, String userRole) {
-        log.info("AUDIT: Creating new stationery item with name: '{}' by user: '{}'", request.getName(), performedBy);
+        log.info("AUDIT: Creating new stationery item: '{}' by user: '{}'", request.getName(), performedBy);
 
+        // Builder pattern: step-by-step object banao — readable aur flexible
         StationeryItem item = StationeryItem.builder()
                 .name(request.getName())
-                .category(request.getCategory().toUpperCase())
+                .category(request.getCategory().toUpperCase()) // Category hamesha uppercase store hogi
                 .unit(request.getUnit())
                 .availableQuantity(request.getAvailableQuantity())
                 .minimumQuantity(request.getMinimumQuantity())
                 .description(request.getDescription())
                 .build();
 
+        // Database mein save karo — savedItem mein auto-generated ID hogi
         StationeryItem savedItem = stationeryItemRepository.save(item);
-        log.info("AUDIT: Successfully created stationery item with ID: {}, name: '{}'",
-                savedItem.getId(), savedItem.getName());
+        log.info("AUDIT: Item created with ID: {}, name: '{}'", savedItem.getId(), savedItem.getName());
 
+        // Audit trail: kaun, kya kiya, kab — compliance aur debugging ke liye
         auditLogger.log(
                 "ITEM_CREATED",
                 performedBy,
                 userRole,
-                String.format("Created stationery item: %s (ID: %d) in category: %s with initial quantity: %d",
-                        savedItem.getName(), savedItem.getId(), savedItem.getCategory(), savedItem.getAvailableQuantity())
+                String.format("Created: %s (ID: %d), Category: %s, Qty: %d",
+                        savedItem.getName(), savedItem.getId(),
+                        savedItem.getCategory(), savedItem.getAvailableQuantity())
         );
 
-        return mapToResponse(savedItem);
+        return mapToResponse(savedItem); // Entity → DTO (client ko sirf zaroori data do)
     }
 
-    /**
-     * Retrieves a stationery item by its ID.
-     *
-     * @param id the item ID
-     * @return the item response
-     * @throws ResourceNotFoundException if the item is not found
-     */
+
+    // ─────────────────────────────────────────────────────────────
+    // READ OPERATIONS
+    // readOnly = true: Spring ko hint deta hai — sirf read hai, write nahi
+    //                  Performance better hoti hai (dirty checking skip hoti hai)
+    // ─────────────────────────────────────────────────────────────
+
+    // ID se single item fetch karo
     @Transactional(readOnly = true)
     public StationeryItemResponse getItemById(Long id) {
-        log.debug("Fetching stationery item with ID: {}", id);
+        log.debug("Fetching item with ID: {}", id);
 
+        // findById → Optional return karta hai
+        // orElseThrow → Optional khaali ho toh exception throw karo
         StationeryItem item = stationeryItemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Stationery item not found with ID: " + id));
@@ -102,112 +113,100 @@ public class InventoryService {
         return mapToResponse(item);
     }
 
-    /**
-     * Retrieves all stationery items with pagination and sorting.
-     *
-     * @param page   the page number (0-indexed)
-     * @param size   the page size (default 20)
-     * @param sortBy the field to sort by
-     * @return a page of item responses
-     */
+    // Saare items fetch karo — Paginated (ek saath sab nahi, thoda thoda)
+    // page: kaun sa page (0 = pehla), size: ek page mein kitne items, sortBy: kis field se sort
     @Transactional(readOnly = true)
     public Page<StationeryItemResponse> getAllItems(int page, int size, String sortBy) {
-        log.debug("Fetching all stationery items - page: {}, size: {}, sortBy: {}", page, size, sortBy);
+        log.debug("Fetching all items - page: {}, size: {}, sortBy: {}", page, size, sortBy);
 
+        // PageRequest = pagination + sorting ki settings ek saath
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortBy));
+
+        // findAll(pageable) → sirf usi page ke items aate hain, sab nahi
         Page<StationeryItem> itemsPage = stationeryItemRepository.findAll(pageable);
 
+        // Page ke andar har entity ko DTO mein convert karo
         return itemsPage.map(this::mapToResponse);
     }
 
-    /**
-     * Retrieves stationery items filtered by category with pagination.
-     *
-     * @param category the category to filter by
-     * @param page     the page number (0-indexed)
-     * @param size     the page size
-     * @return a page of item responses in the specified category
-     */
+    // Category ke hisaab se filter karke fetch karo
     @Transactional(readOnly = true)
     public Page<StationeryItemResponse> getItemsByCategory(String category, int page, int size) {
-        log.debug("Fetching stationery items by category: '{}' - page: {}, size: {}", category, page, size);
+        log.debug("Fetching items by category: '{}' - page: {}, size: {}", category, page, size);
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by("name"));
-        Page<StationeryItem> itemsPage = stationeryItemRepository.findByCategory(category.toUpperCase(), pageable);
+        Pageable pageable = PageRequest.of(page, size, Sort.by("name")); // Name se alphabetically sort
+        Page<StationeryItem> itemsPage = stationeryItemRepository
+                .findByCategory(category.toUpperCase(), pageable); // Case-insensitive match ke liye uppercase
 
         return itemsPage.map(this::mapToResponse);
     }
 
-    /**
-     * Updates an existing stationery item.
-     * Admin-only operation with audit logging of changes.
-     *
-     * @param id      the item ID to update
-     * @param request the update request
-     * @return the updated item response
-     * @throws ResourceNotFoundException if the item is not found
-     */
+
+    // ─────────────────────────────────────────────────────────────
+    // UPDATE ITEM
+    // Sirf changed fields ka log hota hai — full object nahi
+    // changesFound flag: agar koi change na hua toh audit mein note karo
+    // ─────────────────────────────────────────────────────────────
+
     @Transactional
     public StationeryItemResponse updateItem(Long id, StationeryItemRequest request) {
         return updateItem(id, request, "SYSTEM", "ADMIN");
     }
 
-    /**
-     * Updates an existing stationery item with audit logging.
-     *
-     * @param id          the item ID to update
-     * @param request     the update request
-     * @param performedBy the user who performed the action
-     * @param userRole    the role of the user
-     * @return the updated item response
-     * @throws ResourceNotFoundException if the item is not found
-     */
     @Transactional
     public StationeryItemResponse updateItem(Long id, StationeryItemRequest request, String performedBy, String userRole) {
-        log.info("AUDIT: Updating stationery item with ID: {} by user: '{}'", id, performedBy);
+        log.info("AUDIT: Updating item ID: {} by user: '{}'", id, performedBy);
 
+        // Pehle check karo ki item exist karta hai
         StationeryItem existingItem = stationeryItemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Stationery item not found with ID: " + id));
 
-        // Build details explaining exactly what was updated
-        StringBuilder detailsBuilder = new StringBuilder("Updated stationery item '" + existingItem.getName() + "' (ID: " + id + "):");
+        // StringBuilder: audit message dynamically banao — sirf jo badla woh likho
+        StringBuilder detailsBuilder = new StringBuilder(
+                "Updated item '" + existingItem.getName() + "' (ID: " + id + "):");
         boolean changesFound = false;
 
-        // Log field-level changes for audit trail
+        // Field-level comparison: old value vs new value
+        // Sirf changed fields audit trail mein jaate hain — clean logs
         if (!existingItem.getName().equals(request.getName())) {
-            log.info("AUDIT: Item ID {} - name changed from '{}' to '{}'",
-                    id, existingItem.getName(), request.getName());
-            detailsBuilder.append(" [Name: '").append(existingItem.getName()).append("' -> '").append(request.getName()).append("']");
+            log.info("AUDIT: ID {} - name: '{}' -> '{}'", id, existingItem.getName(), request.getName());
+            detailsBuilder.append(" [Name: '").append(existingItem.getName())
+                    .append("' -> '").append(request.getName()).append("']");
             changesFound = true;
         }
         if (!existingItem.getCategory().equals(request.getCategory().toUpperCase())) {
-            log.info("AUDIT: Item ID {} - category changed from '{}' to '{}'",
+            log.info("AUDIT: ID {} - category: '{}' -> '{}'",
                     id, existingItem.getCategory(), request.getCategory().toUpperCase());
-            detailsBuilder.append(" [Category: '").append(existingItem.getCategory()).append("' -> '").append(request.getCategory().toUpperCase()).append("']");
+            detailsBuilder.append(" [Category: '").append(existingItem.getCategory())
+                    .append("' -> '").append(request.getCategory().toUpperCase()).append("']");
             changesFound = true;
         }
         if (!existingItem.getAvailableQuantity().equals(request.getAvailableQuantity())) {
-            log.info("AUDIT: Item ID {} - availableQuantity changed from {} to {}",
+            log.info("AUDIT: ID {} - availableQty: {} -> {}",
                     id, existingItem.getAvailableQuantity(), request.getAvailableQuantity());
-            detailsBuilder.append(" [Quantity: ").append(existingItem.getAvailableQuantity()).append(" -> ").append(request.getAvailableQuantity()).append("]");
+            detailsBuilder.append(" [Qty: ").append(existingItem.getAvailableQuantity())
+                    .append(" -> ").append(request.getAvailableQuantity()).append("]");
             changesFound = true;
         }
         if (!existingItem.getMinimumQuantity().equals(request.getMinimumQuantity())) {
-            log.info("AUDIT: Item ID {} - minimumQuantity changed from {} to {}",
+            log.info("AUDIT: ID {} - minimumQty: {} -> {}",
                     id, existingItem.getMinimumQuantity(), request.getMinimumQuantity());
-            detailsBuilder.append(" [Min Quantity: ").append(existingItem.getMinimumQuantity()).append(" -> ").append(request.getMinimumQuantity()).append("]");
+            detailsBuilder.append(" [Min Qty: ").append(existingItem.getMinimumQuantity())
+                    .append(" -> ").append(request.getMinimumQuantity()).append("]");
             changesFound = true;
         }
+        // Description ke liye null check zaroori hai — NullPointerException se bachao
         if (existingItem.getDescription() == null || !existingItem.getDescription().equals(request.getDescription())) {
             detailsBuilder.append(" [Description changed]");
             changesFound = true;
         }
 
         if (!changesFound) {
-            detailsBuilder.append(" No visible changes made.");
+            detailsBuilder.append(" No changes detected."); // Agar kuch badla hi nahi
         }
 
+        // Naye values set karo aur save karo
         existingItem.setName(request.getName());
         existingItem.setCategory(request.getCategory().toUpperCase());
         existingItem.setUnit(request.getUnit());
@@ -216,135 +215,130 @@ public class InventoryService {
         existingItem.setDescription(request.getDescription());
 
         StationeryItem updatedItem = stationeryItemRepository.save(existingItem);
-        log.info("AUDIT: Successfully updated stationery item with ID: {}", id);
+        log.info("AUDIT: Successfully updated item ID: {}", id);
 
-        auditLogger.log(
-                "ITEM_UPDATED",
-                performedBy,
-                userRole,
-                detailsBuilder.toString()
-        );
+        auditLogger.log("ITEM_UPDATED", performedBy, userRole, detailsBuilder.toString());
 
         return mapToResponse(updatedItem);
     }
 
-    /**
-     * Deletes a stationery item from the inventory.
-     * Admin-only operation with audit logging.
-     *
-     * @param id the item ID to delete
-     * @throws ResourceNotFoundException if the item is not found
-     */
+
+    // ─────────────────────────────────────────────────────────────
+    // DELETE ITEM
+    // Item pehle fetch karo — do reasons:
+    //   1. Exist nahi karta toh exception throw karo
+    //   2. Audit log mein item ka naam chahiye (sirf ID se naam nahi milta)
+    // ─────────────────────────────────────────────────────────────
+
     @Transactional
     public void deleteItem(Long id) {
         deleteItem(id, "SYSTEM", "ADMIN");
     }
 
-    /**
-     * Deletes a stationery item from the inventory with audit logging.
-     *
-     * @param id          the item ID to delete
-     * @param performedBy the user who performed the action
-     * @param userRole    the role of the user
-     * @throws ResourceNotFoundException if the item is not found
-     */
     @Transactional
     public void deleteItem(Long id, String performedBy, String userRole) {
-        log.info("AUDIT: Attempting to delete stationery item with ID: {} by user: '{}'", id, performedBy);
+        log.info("AUDIT: Deleting item ID: {} by user: '{}'", id, performedBy);
 
         StationeryItem item = stationeryItemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Stationery item not found with ID: " + id));
 
         stationeryItemRepository.delete(item);
-        log.info("AUDIT: Successfully deleted stationery item with ID: {}, name: '{}'",
-                id, item.getName());
+        log.info("AUDIT: Deleted item ID: {}, name: '{}'", id, item.getName());
 
         auditLogger.log(
                 "ITEM_DELETED",
                 performedBy,
                 userRole,
-                String.format("Deleted stationery item: %s (ID: %d) from category: %s",
+                String.format("Deleted: %s (ID: %d), Category: %s",
                         item.getName(), item.getId(), item.getCategory())
         );
     }
 
-    /**
-     * Retrieves all items that are at or below their minimum stock level.
-     *
-     * @return list of low-stock item responses
-     */
+
+    // ─────────────────────────────────────────────────────────────
+    // LOW STOCK CHECK
+    // findAll() se saare items aate hain, phir stream filter se
+    // sirf woh items rakhte hain jinka stock minimum se kam ya barabar hai
+    // ─────────────────────────────────────────────────────────────
+
     @Transactional(readOnly = true)
     public List<StationeryItemResponse> getLowStockItems() {
         log.debug("Fetching low stock items");
 
-        List<StationeryItem> allItems = stationeryItemRepository.findAll();
-
-        return allItems.stream()
+        return stationeryItemRepository.findAll()
+                .stream()
+                // availableQuantity <= minimumQuantity → reorder karna chahiye
                 .filter(item -> item.getAvailableQuantity() <= item.getMinimumQuantity())
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Deducts a specified quantity from an item's available stock.
-     * Called internally by the request-service via REST when fulfilling requests.
-     *
-     * @param itemId   the item ID to deduct from
-     * @param quantity the quantity to deduct
-     * @return true if the deduction was successful
-     * @throws ResourceNotFoundException   if the item is not found
-     * @throws InsufficientStockException if available quantity is insufficient
-     */
+
+    // ─────────────────────────────────────────────────────────────
+    // DEDUCT QUANTITY
+    // Request-Service yeh method call karta hai jab koi item request approve ho
+    // Do checks:
+    //   1. Item exist karta hai? (ResourceNotFoundException)
+    //   2. Enough stock hai? (InsufficientStockException)
+    // ─────────────────────────────────────────────────────────────
+
     @Transactional
     public boolean deductQuantity(Long itemId, Integer quantity) {
-        log.info("AUDIT: Deducting quantity {} from item ID: {}", quantity, itemId);
+        log.info("AUDIT: Deducting {} units from item ID: {}", quantity, itemId);
 
         StationeryItem item = stationeryItemRepository.findById(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Stationery item not found with ID: " + itemId));
 
+        // Stock check — deduct karne se pehle verify karo
         if (item.getAvailableQuantity() < quantity) {
             log.warn("AUDIT: Insufficient stock for item ID: {}. Available: {}, Requested: {}",
                     itemId, item.getAvailableQuantity(), quantity);
             throw new InsufficientStockException(
-                    String.format("Insufficient stock for item '%s'. Available: %d, Requested: %d",
+                    String.format("Insufficient stock for '%s'. Available: %d, Requested: %d",
                             item.getName(), item.getAvailableQuantity(), quantity));
         }
 
+        // Current quantity se requested quantity ghata do
         item.setAvailableQuantity(item.getAvailableQuantity() - quantity);
         stationeryItemRepository.save(item);
 
-        log.info("AUDIT: Successfully deducted {} from item ID: {}. New available quantity: {}",
+        log.info("AUDIT: Deducted {} from item ID: {}. New quantity: {}",
                 quantity, itemId, item.getAvailableQuantity());
 
         return true;
     }
 
-    /**
-     * Searches for stationery items by keyword (case-insensitive name match).
-     *
-     * @param keyword the search keyword
-     * @return list of matching item responses
-     */
+
+    // ─────────────────────────────────────────────────────────────
+    // KEYWORD SEARCH
+    // Repository mein custom query hai: findByNameContainingIgnoreCase
+    // "Containing" = LIKE %keyword% SQL mein
+    // "IgnoreCase" = uppercase/lowercase se fark nahi padta
+    // ─────────────────────────────────────────────────────────────
+
     @Transactional(readOnly = true)
     public List<StationeryItemResponse> searchItems(String keyword) {
-        log.debug("Searching stationery items with keyword: '{}'", keyword);
+        log.debug("Searching items with keyword: '{}'", keyword);
 
-        List<StationeryItem> items = stationeryItemRepository.findByNameContainingIgnoreCase(keyword);
-
-        return items.stream()
+        return stationeryItemRepository.findByNameContainingIgnoreCase(keyword)
+                .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Maps a StationeryItem entity to a StationeryItemResponse DTO.
-     * Sets the lowStock flag to true if availableQuantity <= minimumQuantity.
-     *
-     * @param item the entity to map
-     * @return the mapped response DTO
-     */
+
+    // ─────────────────────────────────────────────────────────────
+    // HELPER: Entity → DTO Mapping
+    //
+    // Entity (StationeryItem) = Database ka object, sab fields hote hain
+    // DTO (StationeryItemResponse) = Client ko sirf zaroori data do
+    //
+    // lowStock flag yahan calculate hota hai:
+    //   availableQuantity <= minimumQuantity → true (reorder alert)
+    // ─────────────────────────────────────────────────────────────
+
     public StationeryItemResponse mapToResponse(StationeryItem item) {
         return StationeryItemResponse.builder()
                 .id(item.getId())
@@ -354,7 +348,7 @@ public class InventoryService {
                 .availableQuantity(item.getAvailableQuantity())
                 .minimumQuantity(item.getMinimumQuantity())
                 .description(item.getDescription())
-                .lowStock(item.getAvailableQuantity() <= item.getMinimumQuantity())
+                .lowStock(item.getAvailableQuantity() <= item.getMinimumQuantity()) // true → stock alert dikhao
                 .createdAt(item.getCreatedAt())
                 .updatedAt(item.getUpdatedAt())
                 .build();

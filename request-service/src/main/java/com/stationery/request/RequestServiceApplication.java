@@ -7,6 +7,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 
 @SpringBootApplication
 @EnableDiscoveryClient
+// "Is project mein Feign Clients use honge — unhe dhundo aur enable karo"
 @EnableFeignClients
 public class RequestServiceApplication {
 

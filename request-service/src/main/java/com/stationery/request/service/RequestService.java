@@ -1,36 +1,50 @@
 package com.stationery.request.service;
 
-import com.stationery.request.client.InventoryClient;
-import com.stationery.request.dto.CreateRequestDto;
-import com.stationery.request.dto.RequestItemDto;
-import com.stationery.request.dto.RequestResponse;
-import com.stationery.request.exception.InsufficientStockException;
-import com.stationery.request.exception.ResourceNotFoundException;
+import java.util.List;        // Feign Client — Inventory Service se baat karta hai
+import java.util.stream.Collectors;          // Request banana: items ki list
+
+import org.slf4j.Logger;            // Ek item: itemId + name + quantity
+import org.slf4j.LoggerFactory;           // Client ko bheja jaane wala response
+import org.springframework.stereotype.Service; // Stock kam ho toh
+import org.springframework.transaction.annotation.Transactional;  // Request na mile toh
+
+import com.stationery.request.client.InventoryClient;             // Request ke andar ek line item
+import com.stationery.request.dto.CreateRequestDto;                // Kaun, kya, kab kiya — record
+import com.stationery.request.dto.RequestItemDto;           // Enum: PENDING, APPROVED, REJECTED, FULFILLED
+import com.stationery.request.dto.RequestResponse;       // Main request entity
+import com.stationery.request.exception.InsufficientStockException; // AuditLog DB operations
+import com.stationery.request.exception.ResourceNotFoundException;  // StationeryRequest DB operations
+import com.stationery.request.model.AuditLog;                                 // HTTP error jo Feign client throw karta hai
 import com.stationery.request.model.RequestItem;
-import com.stationery.request.model.AuditLog;
 import com.stationery.request.model.RequestStatus;
 import com.stationery.request.model.StationeryRequest;
 import com.stationery.request.repository.AuditLogRepository;
 import com.stationery.request.repository.RequestRepository;
+
 import feign.FeignException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
+/**
+ * RequestService — Stationery requests ka poora lifecycle yahan manage hota hai.
+ *
+ * Request ka safar:
+ *   PENDING → APPROVED → FULFILLED
+ *   PENDING → REJECTED
+ *
+ * Is service ki khaas baat:
+ *   Approve karte waqt yeh Inventory Service ko Feign Client se call karta hai
+ *   taaki stock automatically deduct ho jaye — do services ek kaam milke karte hain.
+ */
 @Service
 public class RequestService {
 
     private static final Logger log = LoggerFactory.getLogger(RequestService.class);
 
-    private final RequestRepository requestRepository;
-    private final InventoryClient inventoryClient;
-    private final AuditLogRepository auditLogRepository;
+    private final RequestRepository requestRepository;    // Request ka DB
+    private final InventoryClient inventoryClient;        // Inventory microservice ka HTTP client
+    private final AuditLogRepository auditLogRepository;  // Audit trail ka DB
 
-    public RequestService(RequestRepository requestRepository, 
+    // Constructor Injection — teeno dependencies inject ho rahi hain
+    public RequestService(RequestRepository requestRepository,
                           InventoryClient inventoryClient,
                           AuditLogRepository auditLogRepository) {
         this.requestRepository = requestRepository;
@@ -38,37 +52,44 @@ public class RequestService {
         this.auditLogRepository = auditLogRepository;
     }
 
-    /**
-     * Create a new stationery request with PENDING status.
-     */
+
+    // ─────────────────────────────────────────────────────────────
+    // CREATE REQUEST
+    // Student ne items maange — request PENDING status mein banti hai
+    // Abhi inventory touch nahi hoti — sirf request record hoti hai
+    // ─────────────────────────────────────────────────────────────
     @Transactional
     public RequestResponse createRequest(String username, CreateRequestDto createRequestDto) {
-        log.info("AUDIT: Creating new stationery request for student: {}", username);
+        log.info("AUDIT: Creating request for student: {}", username);
 
+        // Nayi request banao — shuru mein hamesha PENDING status
         StationeryRequest request = StationeryRequest.builder()
                 .studentUsername(username)
                 .status(RequestStatus.PENDING)
                 .build();
 
-        // Add each item to the request
+        // DTO se har item uthao aur request mein add karo
+        // addItem() internally request aur item ka bidirectional relationship set karta hai
         for (RequestItemDto itemDto : createRequestDto.getItems()) {
             RequestItem item = RequestItem.builder()
                     .itemId(itemDto.getItemId())
                     .itemName(itemDto.getItemName())
                     .quantity(itemDto.getQuantity())
                     .build();
-            request.addItem(item);
+            request.addItem(item); // Item request se link hoti hai — orphan nahi rehti
         }
 
         StationeryRequest savedRequest = requestRepository.save(request);
-        log.info("AUDIT: Stationery request created successfully. RequestId: {}, Student: {}, Items: {}",
+        log.info("AUDIT: Request created. ID: {}, Student: {}, Items: {}",
                 savedRequest.getRequestId(), username, createRequestDto.getItems().size());
 
+        // Audit trail: student ne kab, kya request kiya
         auditLogRepository.save(new AuditLog(
-                "REQUEST_CREATED", 
-                username, 
+                "REQUEST_CREATED",
+                username,
                 "STUDENT",
-                "Created stationery request with ID: " + savedRequest.getRequestId() + " containing " + createRequestDto.getItems().size() + " items.",
+                "Created request ID: " + savedRequest.getRequestId()
+                        + " containing " + createRequestDto.getItems().size() + " items.",
                 savedRequest.getCreatedAt(),
                 savedRequest.getUpdatedAt()
         ));
@@ -76,9 +97,14 @@ public class RequestService {
         return mapToResponse(savedRequest);
     }
 
-    /**
-     * Get a request by its database ID.
-     */
+
+    // ─────────────────────────────────────────────────────────────
+    // READ OPERATIONS
+    // Multiple ways se request fetch kar sakte hain:
+    //   DB ID se, UUID-based requestId se, student username se, status se
+    // ─────────────────────────────────────────────────────────────
+
+    // Internal DB ID se fetch (Long) — direct DB lookup
     @Transactional(readOnly = true)
     public RequestResponse getRequestById(Long id) {
         log.debug("Fetching request by ID: {}", id);
@@ -87,9 +113,8 @@ public class RequestService {
         return mapToResponse(request);
     }
 
-    /**
-     * Get a request by its UUID-based request ID.
-     */
+    // UUID-based requestId se fetch (String) — client-facing ID
+    // DB ID expose nahi karte client ko — UUID zyada secure hai
     @Transactional(readOnly = true)
     public RequestResponse getRequestByRequestId(String requestId) {
         log.debug("Fetching request by requestId: {}", requestId);
@@ -98,59 +123,59 @@ public class RequestService {
         return mapToResponse(request);
     }
 
-    /**
-     * Get all requests for a specific student.
-     */
+    // Student ki saari requests (koi bhi status)
     @Transactional(readOnly = true)
     public List<RequestResponse> getRequestsByStudent(String username) {
-        log.debug("Fetching requests for student: {}", username);
-        List<StationeryRequest> requests = requestRepository.findByStudentUsername(username);
-        return requests.stream()
+        log.debug("Fetching all requests for student: {}", username);
+        return requestRepository.findByStudentUsername(username)
+                .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Get requests for a specific student filtered by status.
-     */
+    // Student ki requests — specific status se filter karke
     @Transactional(readOnly = true)
     public List<RequestResponse> getRequestsByStudentAndStatus(String username, String status) {
         log.debug("Fetching requests for student: {} with status: {}", username, status);
-        RequestStatus requestStatus = parseStatus(status);
-        List<StationeryRequest> requests = requestRepository.findByStudentUsernameAndStatus(username, requestStatus);
-        return requests.stream()
+        RequestStatus requestStatus = parseStatus(status); // String → Enum convert karo
+        return requestRepository.findByStudentUsernameAndStatus(username, requestStatus)
+                .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Get all requests (Admin only).
-     */
+    // Admin: saari requests bina filter ke
     @Transactional(readOnly = true)
     public List<RequestResponse> getAllRequests() {
         log.debug("Fetching all requests (admin)");
-        List<StationeryRequest> requests = requestRepository.findAll();
-        return requests.stream()
+        return requestRepository.findAll()
+                .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Get all requests filtered by status (Admin only).
-     */
+    // Admin: status se filter karke saari requests
     @Transactional(readOnly = true)
     public List<RequestResponse> getAllRequestsByStatus(String status) {
         log.debug("Fetching all requests with status: {} (admin)", status);
         RequestStatus requestStatus = parseStatus(status);
-        List<StationeryRequest> requests = requestRepository.findByStatus(requestStatus);
-        return requests.stream()
+        return requestRepository.findByStatus(requestStatus)
+                .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Approve a request: change status to APPROVED and deduct inventory quantities.
-     */
+
+    // ─────────────────────────────────────────────────────────────
+    // APPROVE REQUEST
+    // Yeh is service ka sabse important aur complex method hai.
+    //
+    // Do kaam ek saath hone chahiye:
+    //   1. Request status APPROVED ho
+    //   2. Inventory Service mein stock deduct ho
+    //
+    // @Transactional: agar inventory deduct fail ho → request bhi save nahi hogi
+    // ─────────────────────────────────────────────────────────────
     @Transactional
     public RequestResponse approveRequest(Long id, String adminUsername) {
         log.info("AUDIT: Admin '{}' approving request ID: {}", adminUsername, id);
@@ -158,40 +183,49 @@ public class RequestService {
         StationeryRequest request = requestRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Request", "id", id));
 
+        // Sirf PENDING request approve ho sakti hai — already approved/rejected ko nahi
         if (request.getStatus() != RequestStatus.PENDING) {
             throw new IllegalStateException(
-                    "Request can only be approved when in PENDING status. Current status: " + request.getStatus());
+                    "Request can only be approved when PENDING. Current: " + request.getStatus());
         }
 
-        // Deduct inventory for each item
+        // Har item ke liye Inventory Service ko HTTP call karo (Feign Client se)
         for (RequestItem item : request.getItems()) {
             try {
-                log.info("AUDIT: Deducting {} units of item '{}' (ID: {}) from inventory",
+                log.info("AUDIT: Deducting {} units of '{}' (ID: {}) from inventory",
                         item.getQuantity(), item.getItemName(), item.getItemId());
+
+                // Feign Client → Inventory Service ka REST endpoint call karta hai
+                // Internally: POST /api/inventory/{itemId}/deduct?quantity=X
                 inventoryClient.deductItemQuantity(item.getItemId(), item.getQuantity());
+
             } catch (FeignException.BadRequest e) {
-                log.error("AUDIT: Insufficient stock for item '{}' (ID: {}). Approval failed.",
+                // 400 Bad Request = Inventory Service ne stock kam hone ki error di
+                log.error("AUDIT: Insufficient stock for '{}' (ID: {}). Approval failed.",
                         item.getItemName(), item.getItemId());
                 throw new InsufficientStockException(item.getItemName(), item.getQuantity());
+
             } catch (FeignException e) {
-                log.error("AUDIT: Failed to deduct inventory for item '{}' (ID: {}): {}",
-                        item.getItemName(), item.getItemId(), e.getMessage());
-                throw new RuntimeException("Failed to deduct inventory for item: " + item.getItemName(), e);
+                // Koi aur HTTP error — Inventory Service down hai ya network issue
+                log.error("AUDIT: Failed to deduct inventory for '{}': {}",
+                        item.getItemName(), e.getMessage());
+                throw new RuntimeException("Failed to deduct inventory for: " + item.getItemName(), e);
             }
         }
 
+        // Saare items deduct ho gaye — ab status update karo
         request.setStatus(RequestStatus.APPROVED);
         request.setAdminUsername(adminUsername);
         StationeryRequest savedRequest = requestRepository.save(request);
 
-        log.info("AUDIT: Request ID: {} approved by admin '{}'. All inventory deductions successful.",
-                id, adminUsername);
+        log.info("AUDIT: Request ID: {} approved by '{}'. All deductions successful.", id, adminUsername);
 
         auditLogRepository.save(new AuditLog(
-                "REQUEST_APPROVED", 
-                adminUsername, 
+                "REQUEST_APPROVED",
+                adminUsername,
                 "ADMIN",
-                "Approved request ID: " + savedRequest.getRequestId() + " (DB ID: " + id + ") for student: " + savedRequest.getStudentUsername(),
+                "Approved request ID: " + savedRequest.getRequestId()
+                        + " for student: " + savedRequest.getStudentUsername(),
                 savedRequest.getCreatedAt(),
                 savedRequest.getUpdatedAt()
         ));
@@ -199,33 +233,39 @@ public class RequestService {
         return mapToResponse(savedRequest);
     }
 
-    /**
-     * Reject a request: change status to REJECTED with a reason.
-     */
+
+    // ─────────────────────────────────────────────────────────────
+    // REJECT REQUEST
+    // PENDING → REJECTED
+    // Inventory touch nahi hoti — sirf status aur reason save hota hai
+    // ─────────────────────────────────────────────────────────────
     @Transactional
     public RequestResponse rejectRequest(Long id, String adminUsername, String reason) {
-        log.info("AUDIT: Admin '{}' rejecting request ID: {} with reason: '{}'", adminUsername, id, reason);
+        log.info("AUDIT: Admin '{}' rejecting request ID: {} reason: '{}'", adminUsername, id, reason);
 
         StationeryRequest request = requestRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Request", "id", id));
 
+        // Sirf PENDING reject ho sakti hai
         if (request.getStatus() != RequestStatus.PENDING) {
             throw new IllegalStateException(
-                    "Request can only be rejected when in PENDING status. Current status: " + request.getStatus());
+                    "Request can only be rejected when PENDING. Current: " + request.getStatus());
         }
 
         request.setStatus(RequestStatus.REJECTED);
-        request.setRejectionReason(reason);
+        request.setRejectionReason(reason);      // Student ko batao kyun reject hua
         request.setAdminUsername(adminUsername);
         StationeryRequest savedRequest = requestRepository.save(request);
 
-        log.info("AUDIT: Request ID: {} rejected by admin '{}'.", id, adminUsername);
+        log.info("AUDIT: Request ID: {} rejected by '{}'.", id, adminUsername);
 
         auditLogRepository.save(new AuditLog(
-                "REQUEST_REJECTED", 
-                adminUsername, 
+                "REQUEST_REJECTED",
+                adminUsername,
                 "ADMIN",
-                "Rejected request ID: " + savedRequest.getRequestId() + " (DB ID: " + id + ") for student: " + savedRequest.getStudentUsername() + ". Reason: " + reason,
+                "Rejected request ID: " + savedRequest.getRequestId()
+                        + " for student: " + savedRequest.getStudentUsername()
+                        + ". Reason: " + reason,
                 savedRequest.getCreatedAt(),
                 savedRequest.getUpdatedAt()
         ));
@@ -233,9 +273,13 @@ public class RequestService {
         return mapToResponse(savedRequest);
     }
 
-    /**
-     * Fulfill a request: change status from APPROVED to FULFILLED.
-     */
+
+    // ─────────────────────────────────────────────────────────────
+    // FULFILL REQUEST
+    // APPROVED → FULFILLED
+    // Items physically student ko de diye gaye — last step
+    // Inventory pehle hi deduct ho chuki thi approve ke time — yahan nahi hoti
+    // ─────────────────────────────────────────────────────────────
     @Transactional
     public RequestResponse fulfillRequest(Long id) {
         log.info("AUDIT: Fulfilling request ID: {}", id);
@@ -243,9 +287,10 @@ public class RequestService {
         StationeryRequest request = requestRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Request", "id", id));
 
+        // Sirf APPROVED request fulfill ho sakti hai
         if (request.getStatus() != RequestStatus.APPROVED) {
             throw new IllegalStateException(
-                    "Request can only be fulfilled when in APPROVED status. Current status: " + request.getStatus());
+                    "Request can only be fulfilled when APPROVED. Current: " + request.getStatus());
         }
 
         request.setStatus(RequestStatus.FULFILLED);
@@ -254,10 +299,11 @@ public class RequestService {
         log.info("AUDIT: Request ID: {} fulfilled successfully.", id);
 
         auditLogRepository.save(new AuditLog(
-                "REQUEST_FULFILLED", 
-                "SYSTEM", 
+                "REQUEST_FULFILLED",
                 "SYSTEM",
-                "Fulfilled request ID: " + savedRequest.getRequestId() + " (DB ID: " + id + ") for student: " + savedRequest.getStudentUsername(),
+                "SYSTEM",
+                "Fulfilled request ID: " + savedRequest.getRequestId()
+                        + " for student: " + savedRequest.getStudentUsername(),
                 savedRequest.getCreatedAt(),
                 savedRequest.getUpdatedAt()
         ));
@@ -265,17 +311,25 @@ public class RequestService {
         return mapToResponse(savedRequest);
     }
 
-    // ========== Helper Methods ==========
 
+    // ─────────────────────────────────────────────────────────────
+    // HELPER METHODS
+    // ─────────────────────────────────────────────────────────────
+
+    // String → RequestStatus Enum convert karo
+    // "pending" → RequestStatus.PENDING
+    // Invalid value aaye toh clear error message do
     private RequestStatus parseStatus(String status) {
         try {
             return RequestStatus.valueOf(status.toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid request status: " + status
-                    + ". Valid values are: PENDING, APPROVED, REJECTED, FULFILLED");
+            throw new IllegalArgumentException("Invalid status: " + status
+                    + ". Valid values: PENDING, APPROVED, REJECTED, FULFILLED");
         }
     }
 
+    // Entity → DTO: Client ko sirf zaroori data do, internal fields nahi
+    // items ki list bhi map hoti hai: RequestItem → RequestItemDto
     private RequestResponse mapToResponse(StationeryRequest request) {
         List<RequestItemDto> itemDtos = request.getItems().stream()
                 .map(item -> RequestItemDto.builder()
@@ -287,23 +341,22 @@ public class RequestService {
 
         return RequestResponse.builder()
                 .id(request.getId())
-                .requestId(request.getRequestId())
+                .requestId(request.getRequestId())           // UUID — client-facing ID
                 .studentUsername(request.getStudentUsername())
                 .items(itemDtos)
-                .status(request.getStatus().name())
-                .rejectionReason(request.getRejectionReason())
-                .adminUsername(request.getAdminUsername())
+                .status(request.getStatus().name())          // Enum → String: PENDING, APPROVED etc.
+                .rejectionReason(request.getRejectionReason()) // Sirf reject pe populated hoga
+                .adminUsername(request.getAdminUsername())   // Sirf approve/reject pe set hoga
                 .createdAt(request.getCreatedAt())
                 .updatedAt(request.getUpdatedAt())
                 .build();
     }
 
-    /**
-     * Save an audit log from other services or actions.
-     */
+    // External services se aaye audit logs save karo
+    // null timestamps hain toh current time set karo
     @Transactional
     public AuditLog saveAuditLog(AuditLog auditLog) {
-        log.info("Saving external audit log for action: {} by: {}", auditLog.getAction(), auditLog.getPerformedBy());
+        log.info("Saving external audit log: {} by: {}", auditLog.getAction(), auditLog.getPerformedBy());
         if (auditLog.getCreatedTime() == null) {
             auditLog.setCreatedTime(java.time.LocalDateTime.now());
         }
@@ -313,12 +366,9 @@ public class RequestService {
         return auditLogRepository.save(auditLog);
     }
 
-    /**
-     * Get all audit logs sorted by timestamp descending.
-     */
+    // Saare audit logs latest pehle — ID descending order
     @Transactional(readOnly = true)
     public List<AuditLog> getAuditLogs() {
         return auditLogRepository.findAllByOrderByIdDesc();
     }
 }
-
